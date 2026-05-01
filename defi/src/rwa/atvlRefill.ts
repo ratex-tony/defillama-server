@@ -297,20 +297,10 @@ function getOnChainTvlAndActiveMcaps(
     finalData[rwaId][RWA_KEY_MAP.totalSupply][chainDisplayName] = toFixedNumber(prev + supplyDelta, 6);
   };
 
-  // Track (rwaId, chain) pairs filled by the stablecoins-API pass, so the
-  // on-chain pass below skips them (stablecoins API is the priority source for
-  // tracked stablecoins — it captures bridged / wrapped supply that raw
-  // totalSupply() can miss).
-  const stableFilled = new Map<string, Set<string>>();
-  const markStable = (rwaId: string, chain: string) => {
-    let s = stableFilled.get(rwaId);
-    if (!s) { s = new Set(); stableFilled.set(rwaId, s); }
-    s.add(chain);
-  };
-
-  // Phase 1 — stablecoins API. Preferred when present. totalSupply is reverse-
-  // engineered from `stableMcap / price` so mcap and supply stay mathematically
-  // consistent (mcap = supply × price).
+  // Stablecoins-API is the priority source for tracked stablecoins (captures
+  // bridged / wrapped supply that raw totalSupply() can miss). Override mcap +
+  // activeMcap upfront; totalSupply is derived per-chain in the per-token loop
+  // below so it stays consistent: mcap = supply × price.
   Object.keys(stablecoinsData).forEach((cgId: string) => {
     const rwaId = coingeckoIdToRwaId[cgId];
     if (!finalData[rwaId]) return;
@@ -318,15 +308,11 @@ function getOnChainTvlAndActiveMcaps(
     if (!finalData[rwaId][RWA_KEY_MAP.activeMcap] && finalData[rwaId][RWA_KEY_MAP.activeMcapChecked]) {
       finalData[rwaId][RWA_KEY_MAP.activeMcap] = { ...stablecoinsData[cgId] };
     }
-    for (const chain of Object.keys(stablecoinsData[cgId])) markStable(rwaId, chain);
   });
 
   // Multiple token deployments on the same chain share a price, so supply is summed.
   const exclusionApplied = new Set<string>();
 
-  // Phase 2 — on-chain. Fills chains the spreadsheet has contracts for that
-  // Phase 1 didn't already cover. For RWAs without a stablecoins-API match this
-  // is the only path; for those with a match it backstops missing chains.
   Object.keys(assetPrices).forEach((pk: string) => {
     const rwaId = tokenToProjectMap[pk];
     if (!finalData[rwaId]) return;
@@ -334,28 +320,24 @@ function getOnChainTvlAndActiveMcaps(
     const chain = pk.substring(0, pk.indexOf(":"));
     const chainDisplayName = getChainDisplayName(chain, true);
 
-    // For stablecoin RWAs: derive supply from the priority (stableMcap / price),
-    // skip the on-chain accumulation.
-    if (cgId && stablecoinsData[cgId]) {
+    // Stablecoin RWAs: when stablecoinsData covers this chain, derive supply
+    // from stableMcap / price and skip the on-chain accumulation. If it
+    // doesn't cover this chain (chain is in the spreadsheet but not the
+    // stablecoins API), fall through to the on-chain path so we don't drop coverage.
+    if (cgId && stablecoinsData[cgId] && stablecoinsData[cgId][chainDisplayName] != null) {
       if (!finalData[rwaId][RWA_KEY_MAP.price] && assetPrices[pk]?.price) {
         finalData[rwaId][RWA_KEY_MAP.price] = formatNumAsNumber(assetPrices[pk].price);
       }
       const stablePrice = assetPrices[pk]?.price;
-      const stableMcap = Number(stablecoinsData[cgId]?.[chainDisplayName]) || 0;
+      const stableMcap = Number(stablecoinsData[cgId][chainDisplayName]) || 0;
       if (stablePrice && stableMcap) {
         finalData[rwaId][RWA_KEY_MAP.totalSupply] = finalData[rwaId][RWA_KEY_MAP.totalSupply] || {};
         finalData[rwaId][RWA_KEY_MAP.totalSupply][chainDisplayName] = toFixedNumber(stableMcap / stablePrice, 6);
       }
-      // If this chain isn't in stablecoinsData but IS in the spreadsheet,
-      // fall through to the on-chain path below so we don't drop coverage.
-      const stableHasChain = stableFilled.get(rwaId)?.has(chainDisplayName);
-      if (stableHasChain) {
-        if (finalData[rwaId][RWA_KEY_MAP.activeMcapChecked]) {
-          if (!finalData[rwaId][RWA_KEY_MAP.activeMcap]) finalData[rwaId][RWA_KEY_MAP.activeMcap] = { ...finalData[rwaId][RWA_KEY_MAP.onChain] };
-          findActiveMcaps(finalData, rwaId, excludedAmounts, assetPrices[pk], chainDisplayName);
-        }
-        return;
+      if (finalData[rwaId][RWA_KEY_MAP.activeMcapChecked]) {
+        findActiveMcaps(finalData, rwaId, excludedAmounts, assetPrices[pk], chainDisplayName);
       }
+      return;
     }
 
     const { price, decimals } = assetPrices[pk];
