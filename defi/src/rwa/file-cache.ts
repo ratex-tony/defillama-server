@@ -174,18 +174,19 @@ export function mergeHistoricalData(
     return merged;
 }
 
-// PG Cache - stores asset data with chain breakdown (chain keys), keyed by timestamp
+// PG Cache - stores asset data with chain breakdown (chain keys), keyed by timestamp.
+// totalSupply: null = no data; 0 = supply is genuinely zero.
 export interface PGCacheRecord {
     onChainMcap: number;
     activeMcap: number;
     defiActiveTvl: number;
-    totalSupply: number;
+    totalSupply: number | null;
     chains: {
         [chainKey: string]: {
             onChainMcap: number;
             activeMcap: number;
             defiActiveTvl: number;
-            totalSupply: number;
+            totalSupply: number | null;
         };
     };
 }

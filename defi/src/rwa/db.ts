@@ -471,11 +471,16 @@ export async function fetchDailyRecordsWithChainsForIdPG(id: string): Promise<an
 }
 
 export interface FlowRow { timestamp: number; mcap: { [chain: string]: any }; totalsupply: { [chain: string]: any }; }
-export interface FlowPoint { timestamp: number; netFlowUsd: number; netFlowByChain: { [chainLabel: string]: number }; }
+export interface FlowPoint {
+    timestamp: number;
+    netFlowUsd: number | null;
+    netFlowByChain: { [chainLabel: string]: number };
+    missingChains?: string[];
+}
 
-// Pure flow-series computation. Anchors supply per-chain to the first row in the input (closest to start),
-// then for every row computes (supply_t - supply_anchor) * (mcap_t / supply_t) per chain.
-// Exported so the /flows route and tests share the exact same logic.
+// netFlow_t per chain = (supply_t - supply_{t-1}) * (mcap_t / supply_t).
+// Chains missing supply on either side are skipped and listed in missingChains.
+// netFlowUsd is null only when nothing was computable (incl. the first row).
 export function computeFlowSeries(rows: FlowRow[], chainLabelFn: (slug: string) => string = (s) => s): FlowPoint[] {
     if (rows.length === 0) return [];
     const allChains = new Set<string>();
@@ -483,26 +488,40 @@ export function computeFlowSeries(rows: FlowRow[], chainLabelFn: (slug: string) 
         for (const c of Object.keys(row.totalsupply || {})) allChains.add(c);
         for (const c of Object.keys(row.mcap || {})) allChains.add(c);
     }
-    const supplyStart: { [chain: string]: number } = {};
-    for (const c of allChains) supplyStart[c] = Number(rows[0].totalsupply?.[c]) || 0;
 
-    return rows.map((row) => {
+    return rows.map((row, i): FlowPoint => {
+        if (i === 0) return { timestamp: row.timestamp, netFlowUsd: null, netFlowByChain: {} };
+        const prev = rows[i - 1];
         const byChain: { [chain: string]: number } = {};
+        const missingChains: string[] = [];
         let netFlowUsd = 0;
+        let anyComputed = false;
         for (const chainKey of allChains) {
-            const supplyT = Number(row.totalsupply?.[chainKey]) || 0;
+            const prevHas = prev.totalsupply?.[chainKey] != null;
+            const curHas = row.totalsupply?.[chainKey] != null;
             const mcapT = Number(row.mcap?.[chainKey]) || 0;
+            if (!prevHas || !curHas) {
+                const mcapPrev = Number(prev.mcap?.[chainKey]) || 0;
+                if (mcapT > 0 || mcapPrev > 0) missingChains.push(chainLabelFn(chainKey));
+                continue;
+            }
+            const supplyPrev = Number(prev.totalsupply[chainKey]) || 0;
+            const supplyT = Number(row.totalsupply[chainKey]) || 0;
             const priceT = supplyT > 0 ? mcapT / supplyT : 0;
-            const flow = (supplyT - (supplyStart[chainKey] || 0)) * priceT;
+            const flow = (supplyT - supplyPrev) * priceT;
             if (flow !== 0) byChain[chainLabelFn(chainKey)] = flow;
             netFlowUsd += flow;
+            anyComputed = true;
         }
-        return { timestamp: row.timestamp, netFlowUsd, netFlowByChain: byChain };
+        return {
+            timestamp: row.timestamp,
+            netFlowUsd: anyComputed ? netFlowUsd : null,
+            netFlowByChain: byChain,
+            ...(missingChains.length > 0 ? { missingChains } : {}),
+        };
     });
 }
 
-// Fetch daily records for a single ID within a timestamp range, with chain-level mcap + totalsupply.
-// Used by the flows endpoint to compute net-flow time-series for an arbitrary window.
 export async function fetchDailyFlowsForIdPG(id: string, startTs: number, endTs: number): Promise<FlowRow[]> {
     const records = await DAILY_RWA_DATA.findAll({
         attributes: ['timestamp', 'mcap', 'totalsupply'],

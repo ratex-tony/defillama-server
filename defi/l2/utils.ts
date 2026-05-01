@@ -92,9 +92,12 @@ async function restCallWrapper(request: () => Promise<any>, retries: number = 8,
   }
   throw new Error(`couldnt work ${name} call after retries!`);
 }
-async function getOsmosisSupplies(tokens: string[], timestamp?: number): Promise<{ [token: string]: number }> {
+async function getOsmosisSupplies(tokens: string[], timestamp?: number): Promise<{ [token: string]: number | null }> {
   if (timestamp) throw new Error(`timestamp incompatible with Osmosis adapter!`);
-  const supplies: { [token: string]: number } = {};
+  // null = fetch failed; 0 = real-zero supply. Conflating the two filters out
+  // legitimate empty contracts and prevents downstream consumers from telling
+  // a transient RPC error apart from genuine zero supply.
+  const supplies: { [token: string]: number | null } = {};
 
   await PromisePool.withConcurrency(3)
     .for(tokens)
@@ -103,17 +106,19 @@ async function getOsmosisSupplies(tokens: string[], timestamp?: number): Promise
         const res = await fetch(`https://lcd.osmosis.zone/cosmos/bank/v1beta1/supply/by_denom?denom=${token}`).then(
           (r) => r.json()
         );
-        if (res && res.amount) supplies[`osmosis:${token}`] = res.amount.amount;
+        const amount = res?.amount?.amount;
+        supplies[`osmosis:${token}`] = amount != null ? Number(amount) : null;
       } catch (e) {
-        // console.log(token);
+        supplies[`osmosis:${token}`] = null;
       }
     });
 
   return supplies;
 }
-async function getAptosSupplies(tokens: string[], timestamp?: number): Promise<{ [token: string]: number }> {
+async function getAptosSupplies(tokens: string[], timestamp?: number): Promise<{ [token: string]: number | null }> {
   if (timestamp) throw new Error(`timestamp incompatible with Aptos adapter!`);
-  const supplies: { [token: string]: number } = {};
+  // null = fetch failed; 0 = real-zero supply.
+  const supplies: { [token: string]: number | null } = {};
   const rpc = process.env.APTOS_RPC;
 
   await PromisePool.withConcurrency(1)
@@ -162,9 +167,13 @@ async function getAptosSupplies(tokens: string[], timestamp?: number): Promise<{
         ).then((r) => r.json());
         if (supplyRes?.data?.current != null) {
           supplies[`aptos:${token}`] = Number(supplyRes.data.current);
+          return;
         }
+        // None of the supply paths matched — record null so consumers see
+        // "no data" rather than the entry being silently absent.
+        supplies[`aptos:${token}`] = null;
       } catch (e) {
-        // silent — supply will be missing and logged upstream
+        supplies[`aptos:${token}`] = null;
       }
     });
 
@@ -215,7 +224,7 @@ async function getSolanaTokenSupply(
   tokens: string[],
   chain: string,
   timestamp?: number
-): Promise<{ [token: string]: number }> {
+): Promise<{ [token: string]: number | null }> {
   if (timestamp) throw new Error(`timestamp incompatible with ${chain} adapter!`);
 
   const solanaMintLayout = BufferLayout.struct([u64("supply")]);
@@ -232,27 +241,32 @@ async function getSolanaTokenSupply(
   });
   const connection = getConnection(chain);
   const res = await runInChunks(tokensPK, (chunk: any) => connection.getMultipleAccountsInfo(chunk), { sleepTime });
-  const supplies: { [token: string]: number } = {};
+  // null = fetch / decode failed; 0 = real-zero supply.
+  const supplies: { [token: string]: number | null } = {};
 
   res.forEach((data, idx) => {
+    const key = `${chain}:` + filteredTokens[idx];
     if (!data) {
-      sdk.log(`Invalid account: ${tokens[idx]}`);
+      sdk.log(`Invalid account: ${filteredTokens[idx]}`);
+      supplies[key] = null;
       return;
     }
     try {
       const buffer = data.data.slice(36, 44);
       const supply = solanaMintLayout.decode(buffer).supply.toString();
-      supplies[`${chain}:` + filteredTokens[idx]] = supply;
+      supplies[key] = supply as any;
     } catch (e) {
       sdk.log(`Error decoding account: ${filteredTokens[idx]}`);
+      supplies[key] = null;
     }
   });
 
   return supplies;
 }
-async function getProvenanceSupplies(tokens: string[], timestamp?: number): Promise<{ [token: string]: number }> {
+async function getProvenanceSupplies(tokens: string[], timestamp?: number): Promise<{ [token: string]: number | null }> {
   if (timestamp) throw new Error(`timestamp incompatible with Provenance adapter!`);
-  const supplies: { [token: string]: number } = {};
+  // null = fetch failed; 0 = real-zero supply.
+  const supplies: { [token: string]: number | null } = {};
   const PROVENANCE_LCD = "https://api.provenance.io";
 
   await PromisePool.withConcurrency(3)
@@ -262,8 +276,11 @@ async function getProvenanceSupplies(tokens: string[], timestamp?: number): Prom
         const res = await fetch(
           `${PROVENANCE_LCD}/cosmos/bank/v1beta1/supply/by_denom?denom=${encodeURIComponent(token)}`
         ).then((r) => r.json());
-        if (res?.amount?.amount) supplies[`provenance:${token}`] = Number(res.amount.amount);
-      } catch (e) {}
+        const amount = res?.amount?.amount;
+        supplies[`provenance:${token}`] = amount != null ? Number(amount) : null;
+      } catch (e) {
+        supplies[`provenance:${token}`] = null;
+      }
     });
 
   return supplies;
@@ -290,9 +307,10 @@ function isSorobanContractId(token: string): boolean {
   return /^C[A-Z2-7]{55}$/.test(token) && !(token in stellarSacToClassic);
 }
 
-async function getStellarSupplies(tokens: string[], timestamp?: number): Promise<{ [token: string]: number }> {
+async function getStellarSupplies(tokens: string[], timestamp?: number): Promise<{ [token: string]: number | null }> {
   if (timestamp) throw new Error(`timestamp incompatible with Stellar adapter!`);
-  const supplies: { [token: string]: number } = {};
+  // null = fetch failed; 0 = real-zero supply.
+  const supplies: { [token: string]: number | null } = {};
 
   await PromisePool.withConcurrency(3)
     .for(tokens)
@@ -301,17 +319,17 @@ async function getStellarSupplies(tokens: string[], timestamp?: number): Promise
         // Native Soroban contracts: call total_supply() via RPC
         if (isSorobanContractId(token)) {
           const supply = await getSorobanTokenSupply(token);
-          if (supply != null && supply > BigInt(0)) supplies[`stellar:${token}`] = Number(supply);
+          supplies[`stellar:${token}`] = supply == null ? null : Number(supply);
           return;
         }
 
         // Resolve Soroban SAC contract IDs to classic "code-issuer" format
         const classicKey = stellarSacToClassic[token] ?? token;
-        if (classicKey === "XLM") return; // native asset handled by ownTokens
+        if (classicKey === "XLM") return; // native asset handled by ownTokens (intentional skip, no entry)
 
         // Token format: "{asset_code}-{asset_issuer}" (dash-separated)
         const dashIdx = classicKey.lastIndexOf("-");
-        if (dashIdx === -1) return;
+        if (dashIdx === -1) return; // malformed input, intentional skip
         const asset_code = classicKey.substring(0, dashIdx);
         const asset_issuer = classicKey.substring(dashIdx + 1);
         const res = await fetch(
@@ -319,19 +337,22 @@ async function getStellarSupplies(tokens: string[], timestamp?: number): Promise
         ).then((r) => r.json());
         const record = res?._embedded?.records?.[0];
         if (record?.balances?.authorized != null) {
-          // Horizon exposes amount in display units with 7 implicit decimal places.
-          // Multiply by 1e7 to align with decimals=7 returned by the price API.
           supplies[`stellar:${token}`] = Math.round(parseFloat(record.balances.authorized) * 1e7);
+        } else {
+          supplies[`stellar:${token}`] = null;
         }
-      } catch (e) {}
+      } catch (e) {
+        supplies[`stellar:${token}`] = null;
+      }
     });
 
   return supplies;
 }
 
-async function getStarknetSupplies(tokens: string[], timestamp?: number): Promise<{ [token: string]: number }> {
+async function getStarknetSupplies(tokens: string[], timestamp?: number): Promise<{ [token: string]: number | null }> {
   if (timestamp) throw new Error(`timestamp incompatible with Starknet adapter!`);
-  const supplies: { [token: string]: number } = {};
+  // null = fetch failed; 0 = real-zero supply.
+  const supplies: { [token: string]: number | null } = {};
   const STARKNET_RPC = process.env.STARKNET_RPC ?? "https://starknet-mainnet.public.blastapi.io";
   const TOTAL_SUPPLY_SELECTOR = "0x1557182e4359a1f0c6301278e8f5b35a776ab58d39892581e357578fb287836";
 
@@ -360,19 +381,22 @@ async function getStarknetSupplies(tokens: string[], timestamp?: number): Promis
           const low = new BigNumber(res.result[0]);
           const high = new BigNumber(res.result[1]);
           const supply = low.plus(high.times(new BigNumber(2).pow(128)));
-          if (supply.gt(0)) supplies[`starknet:${token}`] = supply.toNumber();
+          supplies[`starknet:${token}`] = supply.toNumber();
+        } else {
+          supplies[`starknet:${token}`] = null;
         }
       } catch (e) {
-        e
+        supplies[`starknet:${token}`] = null;
       }
     });
 
   return supplies;
 }
 
-async function getSuiSupplies(tokens: Address[], timestamp?: number): Promise<{ [token: string]: number }> {
+async function getSuiSupplies(tokens: Address[], timestamp?: number): Promise<{ [token: string]: number | null }> {
   if (timestamp) throw new Error(`timestamp incompatible with Sui adapter!`);
-  const supplies: { [token: string]: number } = {};
+  // null = fetch failed; 0 = real-zero supply.
+  const supplies: { [token: string]: number | null } = {};
 
   await PromisePool.withConcurrency(5)
     .for(tokens)
@@ -388,9 +412,10 @@ async function getSuiSupplies(tokens: Address[], timestamp?: number): Promise<{ 
           }),
           headers: { "Content-Type": "application/json" },
         }).then((r) => r.json());
-        if (res && res.result && res.result.value) supplies[`sui:${token}`] = res.result.value;
+        const value = res?.result?.value;
+        supplies[`sui:${token}`] = value != null ? Number(value) : null;
       } catch (e) {
-        // console.log(token);
+        supplies[`sui:${token}`] = null;
       }
     });
 
@@ -400,9 +425,11 @@ async function getEVMSupplies(
   chain: Chain,
   contracts: Address[],
   timestamp?: number
-): Promise<{ [token: string]: number }> {
+): Promise<{ [token: string]: number | null }> {
   const step: number = 200;
-  const supplies: { [token: string]: number } = {};
+  // null = multicall failed for this contract; explicit so callers can
+  // distinguish a fetch failure from a contract whose totalSupply is 0.
+  const supplies: { [token: string]: number | null } = {};
   const block: any = timestamp ? await getBlock(chain, timestamp) : undefined;
 
   for (let i = 0; i < contracts.length; i += step) {
@@ -417,7 +444,8 @@ async function getEVMSupplies(
         block: block?.block,
       });
       contracts.slice(i, i + step).map((c: Address, i: number) => {
-        if (res[i]) supplies[`${chain}:${bridgedTvlMixedCaseChains.includes(chain) ? c : c.toLowerCase()}`] = res[i];
+        const key = `${chain}:${bridgedTvlMixedCaseChains.includes(chain) ? c : c.toLowerCase()}`;
+        supplies[key] = res[i] ?? null;
       });
     } catch (e) {
       try {
@@ -450,7 +478,7 @@ export async function fetchSupplies(
   chain: Chain,
   tokens: Address[],
   timestamp: number | undefined
-): Promise<{ [token: string]: number }> {
+): Promise<{ [token: string]: number | null }> {
   try {
     if (chain == "osmosis") return await getOsmosisSupplies(tokens, timestamp);
     if (chain == "aptos") return await getAptosSupplies(tokens, timestamp);

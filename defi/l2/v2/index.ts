@@ -38,7 +38,7 @@ async function fetchNativeAndMcaps(timestamp: number): Promise<{
     [chain: Chain]: {
       prices: { [token: string]: CoinsApiData };
       mcaps: { [token: string]: McapsApiData };
-      supplies: { [token: string]: number };
+      supplies: { [token: string]: number | null };
     };
   };
   allPrices: { [token: string]: CoinsApiData };
@@ -48,7 +48,7 @@ async function fetchNativeAndMcaps(timestamp: number): Promise<{
     [chain: Chain]: {
       prices: { [token: string]: CoinsApiData };
       mcaps: { [token: string]: McapsApiData };
-      supplies: { [token: string]: number };
+      supplies: { [token: string]: number | null };
     };
   } = {};
 
@@ -381,10 +381,12 @@ export async function storeChainAssetsV2(override: boolean = false) {
         const key = normalizeKey(token);
         const coinData = allPrices[key];
         if (!coinData || !coinData.price) return;
+        // null = fetch failed; skip rather than treat as 0.
+        if (supplies[token] == null) return;
         const excludedAmount = excludedAmounts[chain]?._balances[key] ?? zero;
         const sourceChainAmount = sourceChainAmounts[chain]?.[key] ?? zero;
 
-        const nativeAmount = BigNumber(supplies[token]);
+        const nativeAmount = BigNumber(supplies[token] as number);
         const actualAmount = nativeAmount.minus(excludedAmount).minus(sourceChainAmount);
         const usdAmount = BigNumber(
           actualAmount.times(coinData.price).div(BigNumber(10).pow(coinData.decimals)).toFixed(2)

@@ -2,6 +2,7 @@ import * as HyperExpress from 'hyper-express';
 import { readRouteData, getCacheVersion, readPGCacheForId } from './file-cache';
 import { rwaSlug } from './utils';
 import { initPG, fetchDailyFlowsForIdPG, computeFlowSeries } from './db';
+import { trimLeadingZeros } from './cron';
 import { getChainLabelFromKey } from '../utils/normalizeChain';
 
 const webserver = new HyperExpress.Server();
@@ -190,18 +191,11 @@ function setRoutes(router: HyperExpress.Router): void {
             if (!pgCache) {
                 return errorResponse(res, `Asset "${id}" not found`, 404);
             }
-            // Convert pg-cache map to sorted array
-            const data = Object.entries(pgCache)
-                .map(([timestamp, record]) => ({ timestamp: Number(timestamp), ...record }))
-                .sort((a, b) => a.timestamp - b.timestamp);
-            while (data.length > 0) {
-                const first = data[0];
-                if (first.onChainMcap === 0 && first.defiActiveTvl === 0 && (!first.activeMcap || first.activeMcap === 0)) {
-                    data.shift();
-                } else {
-                    break;
-                }
-            }
+            const data = trimLeadingZeros(
+                Object.entries(pgCache)
+                    .map(([timestamp, record]) => ({ timestamp: Number(timestamp), ...record }))
+                    .sort((a, b) => a.timestamp - b.timestamp)
+            );
             return successResponse(res, data, 30);
         })
     );
@@ -284,9 +278,7 @@ function setRoutes(router: HyperExpress.Router): void {
         })
     );
 
-    // Get net-flow time-series for a specific RWA over an arbitrary window.
-    // Net flow at each timestamp is computed as (supply_t - supply_start) * price_t per chain,
-    // so price moves do not pollute the flow figure.
+    // Daily net-flow time-series for one RWA over [start, end].
     router.get(
         '/flows/:id',
         errorWrapper(async (req, res) => {

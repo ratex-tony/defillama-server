@@ -60,8 +60,10 @@ async function getAggregateRawTvls(rwaTokens: { [chain: string]: string[] }, tim
   return aggregateRawTvls;
 }
 
+// null entries mean "fetch failed for this token" (skip the chain entry on the
+// downstream write so we don't fabricate data); 0 entries are real-zero contracts.
 async function getTotalSupplies(tokensSortedByChain: { [chain: string]: string[] }, timestamp: number) {
-  const totalSupplies: { [token: string]: number } = {};
+  const totalSupplies: { [token: string]: number | null } = {};
 
   await runInPromisePool({
     items: Object.keys(tokensSortedByChain),
@@ -288,14 +290,6 @@ function getOnChainTvlAndActiveMcaps(
   totalSupplies: any,
   excludedAmounts: any,
 ) {
-   Object.keys(stablecoinsData).forEach((cgId: string) => {
-    const rwaId = coingeckoIdToRwaId[cgId];
-    if (!finalData[rwaId]) return;
-    finalData[rwaId][RWA_KEY_MAP.onChain] = stablecoinsData[cgId];
-    if (!finalData[rwaId][RWA_KEY_MAP.activeMcap] && finalData[rwaId][RWA_KEY_MAP.activeMcapChecked]) finalData[rwaId][RWA_KEY_MAP.activeMcap] = { ...stablecoinsData[cgId] };
-  });
-
-  // Track per-chain decimal-adjusted total supply alongside onChainMcap.
   // Multiple token deployments on the same chain share a price, so supply is summed.
   const setTotalSupply = (rwaId: string, chainDisplayName: string, supplyDelta: number) => {
     if (!finalData[rwaId]) return;
@@ -304,11 +298,36 @@ function getOnChainTvlAndActiveMcaps(
     finalData[rwaId][RWA_KEY_MAP.totalSupply][chainDisplayName] = toFixedNumber(prev + supplyDelta, 6);
   };
 
-  // An RWA can have multiple token addresses on the same chain; aggregate across
-  // them rather than overwriting, and only subtract excluded balances once per
-  // (rwaId, chain) since excludedAmounts is already a per-(rwaId, chain) total.
+  // Track (rwaId, chain) pairs filled by the stablecoins-API pass, so the
+  // on-chain pass below skips them (stablecoins API is the priority source for
+  // tracked stablecoins — it captures bridged / wrapped supply that raw
+  // totalSupply() can miss).
+  const stableFilled = new Map<string, Set<string>>();
+  const markStable = (rwaId: string, chain: string) => {
+    let s = stableFilled.get(rwaId);
+    if (!s) { s = new Set(); stableFilled.set(rwaId, s); }
+    s.add(chain);
+  };
+
+  // Phase 1 — stablecoins API. Preferred when present. totalSupply is reverse-
+  // engineered from `stableMcap / price` so mcap and supply stay mathematically
+  // consistent (mcap = supply × price).
+  Object.keys(stablecoinsData).forEach((cgId: string) => {
+    const rwaId = coingeckoIdToRwaId[cgId];
+    if (!finalData[rwaId]) return;
+    finalData[rwaId][RWA_KEY_MAP.onChain] = stablecoinsData[cgId];
+    if (!finalData[rwaId][RWA_KEY_MAP.activeMcap] && finalData[rwaId][RWA_KEY_MAP.activeMcapChecked]) {
+      finalData[rwaId][RWA_KEY_MAP.activeMcap] = { ...stablecoinsData[cgId] };
+    }
+    for (const chain of Object.keys(stablecoinsData[cgId])) markStable(rwaId, chain);
+  });
+
+  // Multiple token deployments on the same chain share a price, so supply is summed.
   const exclusionApplied = new Set<string>();
 
+  // Phase 2 — on-chain. Fills chains the spreadsheet has contracts for that
+  // Phase 1 didn't already cover. For RWAs without a stablecoins-API match this
+  // is the only path; for those with a match it backstops missing chains.
   Object.keys(assetPrices).forEach((pk: string) => {
     const rwaId = tokenToProjectMap[pk];
     if (!finalData[rwaId]) return;
@@ -316,28 +335,36 @@ function getOnChainTvlAndActiveMcaps(
     const chain = pk.substring(0, pk.indexOf(":"));
     const chainDisplayName = getChainDisplayName(chain, true);
 
+    // For stablecoin RWAs: derive supply from the priority (stableMcap / price),
+    // skip the on-chain accumulation.
     if (cgId && stablecoinsData[cgId]) {
-      finalData[rwaId][RWA_KEY_MAP.onChain] = stablecoinsData[cgId];
       if (!finalData[rwaId][RWA_KEY_MAP.price] && assetPrices[pk]?.price) {
         finalData[rwaId][RWA_KEY_MAP.price] = formatNumAsNumber(assetPrices[pk].price);
       }
-      // Derive supply from stablecoin mcap / price for this chain (price ~$1 typically).
       const stablePrice = assetPrices[pk]?.price;
       const stableMcap = Number(stablecoinsData[cgId]?.[chainDisplayName]) || 0;
       if (stablePrice && stableMcap) {
         finalData[rwaId][RWA_KEY_MAP.totalSupply] = finalData[rwaId][RWA_KEY_MAP.totalSupply] || {};
         finalData[rwaId][RWA_KEY_MAP.totalSupply][chainDisplayName] = toFixedNumber(stableMcap / stablePrice, 6);
       }
-      if (finalData[rwaId][RWA_KEY_MAP.activeMcapChecked]) {
-        if (!finalData[rwaId][RWA_KEY_MAP.activeMcap]) finalData[rwaId][RWA_KEY_MAP.activeMcap] = { ...finalData[rwaId][RWA_KEY_MAP.onChain] };
-        findActiveMcaps(finalData, rwaId, excludedAmounts, assetPrices[pk], chainDisplayName);
+      // If this chain isn't in stablecoinsData but IS in the spreadsheet,
+      // fall through to the on-chain path below so we don't drop coverage.
+      const stableHasChain = stableFilled.get(rwaId)?.has(chainDisplayName);
+      if (stableHasChain) {
+        if (finalData[rwaId][RWA_KEY_MAP.activeMcapChecked]) {
+          if (!finalData[rwaId][RWA_KEY_MAP.activeMcap]) finalData[rwaId][RWA_KEY_MAP.activeMcap] = { ...finalData[rwaId][RWA_KEY_MAP.onChain] };
+          findActiveMcaps(finalData, rwaId, excludedAmounts, assetPrices[pk], chainDisplayName);
+        }
+        return;
       }
-      return;
     }
 
     const { price, decimals } = assetPrices[pk];
     const supply = totalSupplies[pk];
-    if (!supply || !price) {
+    // null = fetch failed → skip (don't fabricate or wipe existing data).
+    // 0 / any number = real reading → fall through; 0 produces an explicit 0
+    // chain entry that overwrites stale stored values.
+    if (supply == null || !price) {
       if (process.env.DEBUG_ENABLED) console.error(`No supply or price for ${pk}`);
       return;
     }
@@ -379,7 +406,7 @@ function getOnChainTvlAndActiveMcaps(
     const activeMcap = finalData[rwaId][RWA_KEY_MAP.activeMcap];
     if (!activeMcap) return;
     finalData[rwaId][RWA_KEY_MAP.onChain] = { ...activeMcap };
-    // Recompute totalSupply per chain from the new onChain value to stay consistent with mcap.
+    // Re-derive totalSupply from the overridden mcap so mcap = supply * price still holds.
     const price = Number(finalData[rwaId][RWA_KEY_MAP.price]) || 0;
     if (!price) return;
     const supplyByChain: { [chain: string]: number } = {};

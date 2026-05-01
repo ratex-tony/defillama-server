@@ -31,8 +31,7 @@ export interface AtvlPerIdData {
   totalSupply?: { [chain: string]: number | string };
 }
 
-// Pure transform: atvl per-id output → DB insert row. Exported for unit tests so they can assert on the
-// exact JSON / aggregate values that would be written to Postgres without exercising the DB.
+// Pure transform: atvl per-id output → DB insert row.
 export function buildAtvlInsert(id: string, perId: AtvlPerIdData, timestamp: number): AtvlInsert {
   const { defiActiveTvl, onChainMcap, activeMcap, totalSupply } = perId;
 
