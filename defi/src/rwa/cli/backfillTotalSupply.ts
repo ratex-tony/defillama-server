@@ -67,12 +67,13 @@ async function getDistinctTimestamps(): Promise<number[]> {
   return rows.map((r) => r.timestamp);
 }
 
-async function fetchRowsAtTimestamp(timestamp: number): Promise<Array<{ id: string; timestamp: number; mcap: any; totalsupply: any }>> {
+async function fetchRowsAtTimestamp(timestamp: number): Promise<Array<{ id: string; timestamp: number; timestamp_actual: number; mcap: any; totalsupply: any }>> {
   const rows: any[] = [];
   let offset = 0;
   while (true) {
     const batch = await DAILY_RWA_DATA.findAll({
-      attributes: ["id", "timestamp", "mcap", "totalsupply"],
+      // timestamp_actual is NOT NULL — pass it through bulkCreate's INSERT unchanged.
+      attributes: ["id", "timestamp", "timestamp_actual", "mcap", "totalsupply"],
       where: { timestamp },
       order: [["id", "ASC"]],
       limit: ROW_BATCH_SIZE,
@@ -87,6 +88,7 @@ async function fetchRowsAtTimestamp(timestamp: number): Promise<Array<{ id: stri
   return rows.map((r) => ({
     id: r.id,
     timestamp: r.timestamp,
+    timestamp_actual: r.timestamp_actual,
     mcap: parseJson(r.mcap),
     totalsupply: parseJson(r.totalsupply),
   }));
@@ -122,7 +124,7 @@ async function processTimestamp(
   }
   const prices = await fetchPricesBatched(tokens, timestamp);
 
-  const updates: Array<{ id: string; timestamp: number; totalsupply: string }> = [];
+  const updates: Array<{ id: string; timestamp: number; timestamp_actual: number; totalsupply: string }> = [];
   for (const row of rowsNeedingWork) {
     const reps = repByRwa[row.id];
     if (!reps) continue;
@@ -141,7 +143,12 @@ async function processTimestamp(
       supplyByChain[chain] = String(mcap / price);
       mutated = true;
     }
-    if (mutated) updates.push({ id: row.id, timestamp: row.timestamp, totalsupply: JSON.stringify(supplyByChain) });
+    if (mutated) updates.push({
+      id: row.id,
+      timestamp: row.timestamp,
+      timestamp_actual: row.timestamp_actual,
+      totalsupply: JSON.stringify(supplyByChain),
+    });
   }
 
   stats.rowsScanned += rows.length;
