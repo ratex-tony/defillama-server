@@ -60,10 +60,9 @@ async function getAggregateRawTvls(rwaTokens: { [chain: string]: string[] }, tim
   return aggregateRawTvls;
 }
 
-// null entries mean "fetch failed for this token" (skip the chain entry on the
-// downstream write so we don't fabricate data); 0 entries are real-zero contracts.
+// Missing keys mean fetch failed; 0 entries are real-zero contracts.
 async function getTotalSupplies(tokensSortedByChain: { [chain: string]: string[] }, timestamp: number) {
-  const totalSupplies: { [token: string]: number | null } = {};
+  const totalSupplies: { [token: string]: number } = {};
 
   await runInPromisePool({
     items: Object.keys(tokensSortedByChain),
