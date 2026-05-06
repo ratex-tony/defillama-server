@@ -204,4 +204,5 @@ export default {
   navTokens: require("./rwa/navTokens"),
   safo: require("./rwa/safo"),
   xaue: require("./rwa/xaue"),
+  dCOMP: require("./other/dCOMP"),
 };
