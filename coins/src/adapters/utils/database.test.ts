@@ -2,7 +2,7 @@ jest.mock("../../../../defi/src/utils/discord", () => ({
   sendMessage: jest.fn(() => Promise.resolve()),
 }));
 
-import { addToDBWritesList } from "./database";
+import { addToDBWritesList, __resetNumericWarningsForTests } from "./database";
 import { sendMessage } from "../../../../defi/src/utils/discord";
 import type { Write } from "./dbInterfaces";
 
@@ -10,6 +10,7 @@ const mockSendMessage = sendMessage as jest.Mock;
 
 beforeEach(() => {
   mockSendMessage.mockClear();
+  __resetNumericWarningsForTests();
   process.env.STALE_COINS_ADAPTERS_WEBHOOK = "https://discord.test/webhook";
 });
 
@@ -109,8 +110,9 @@ describe("addToDBWritesList numeric guardrail", () => {
     expect(mockSendMessage.mock.calls[0][0]).toMatch(/confidence/);
   });
 
-  test("dedup: same adapter+field+reason only warns once per process", () => {
+  test("dedup: same adapter+field+reason emits on threshold boundaries (1, 10, ...)", () => {
     const writes: Write[] = [];
+    // 5 calls — only the first crosses a threshold, so exactly one Discord msg.
     for (let i = 0; i < 5; i++) {
       addToDBWritesList(
         writes,
@@ -124,8 +126,43 @@ describe("addToDBWritesList numeric guardrail", () => {
         0.99,
       );
     }
-    // 5 writes happened; only 1 warn was sent.
     expect(writes).toHaveLength(5);
     expect(mockSendMessage).toHaveBeenCalledTimes(1);
+
+    // 5 more calls bring the count to 10 — second threshold, second Discord msg.
+    for (let i = 5; i < 10; i++) {
+      addToDBWritesList(
+        writes,
+        "ethereum",
+        `0xF${i}`,
+        "garbage" as any,
+        18,
+        "X",
+        TS,
+        "dedup-adapter",
+        0.99,
+      );
+    }
+    expect(writes).toHaveLength(10);
+    expect(mockSendMessage).toHaveBeenCalledTimes(2);
+    expect(mockSendMessage.mock.calls[1][0]).toMatch(/seen 10 time/);
+  });
+
+  test("webhook unset: console.error still fires but no Discord call", () => {
+    delete process.env.STALE_COINS_ADAPTERS_WEBHOOK;
+    const writes: Write[] = [];
+    addToDBWritesList(
+      writes,
+      "ethereum",
+      "0xF99",
+      1.0,
+      18,
+      "X",
+      TS,
+      "no-webhook-adapter",
+      undefined as any,
+    );
+    expect(writes).toHaveLength(1);
+    expect(mockSendMessage).not.toHaveBeenCalled();
   });
 });

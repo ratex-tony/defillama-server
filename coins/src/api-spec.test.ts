@@ -125,10 +125,12 @@ d("Coins API — spec compliance", () => {
 
     describe("type regression guards (will fail until #11797 deploys)", () => {
       test("SPYon (Ondo equity) — price must be a number, not a string", async () => {
-        const r = await get(`${P}/${SPYON}`);
+        // Use a wide searchWidth so the regression guard is deterministic — without
+        // this, the coin can age out and the test silently passes.
+        const r = await get(`${P}/${SPYON}`, { searchWidth: "30d" });
         expect(r.status).toBe(200);
         const coin = r.data.coins[SPYON];
-        if (!coin) return; // token may age out of searchWidth; not a type-drift failure
+        expect(coin).toBeDefined();
         expect({ field: "price", type: typeof coin.price }).toEqual({
           field: "price",
           type: "number",
@@ -216,11 +218,17 @@ d("Coins API — spec compliance", () => {
       const body = { [checksum]: [1700000000], [lower]: [1700000000] };
       const r = await get(P, { coins: JSON.stringify(body) });
       expect(r.status).toBe(200);
+      // Regression: the two casings must collapse to a single canonical key.
+      expect(Object.keys(r.data.coins).length).toBeLessThanOrEqual(1);
+      const allTimestamps: number[] = [];
       for (const [k, v] of Object.entries(r.data.coins)) {
         const coin = v as any;
-        // Regression: used to duplicate entries. Each key should have ≤1 per requested ts.
+        // And each returned key must have ≤1 entry per requested ts.
         expect(coin.prices.length).toBeLessThanOrEqual(1);
+        for (const p of coin.prices) allTimestamps.push(p.timestamp);
       }
+      // Timestamps across all returned entries must be unique (no duplicate (cid, ts)).
+      expect(new Set(allTimestamps).size).toBe(allTimestamps.length);
     }, TEST_TIMEOUT);
 
     test("empty timestamps array is tolerated", async () => {
@@ -246,8 +254,9 @@ d("Coins API — spec compliance", () => {
       const coin = r.data.coins[USDC];
       if (!coin) return;
       expect(typeof coin.symbol).toBe("string");
-      assertFiniteNumber(coin.decimals, "coin.decimals");
-      assertFiniteNumber(coin.confidence, "coin.confidence");
+      // decimals/confidence are optional in the spec — only assert when present.
+      if ("decimals" in coin) assertFiniteNumber(coin.decimals, "coin.decimals");
+      if ("confidence" in coin) assertFiniteNumber(coin.confidence, "coin.confidence");
       expect(Array.isArray(coin.prices)).toBe(true);
       expect(coin.prices.length).toBeGreaterThan(0);
       for (const p of coin.prices) {

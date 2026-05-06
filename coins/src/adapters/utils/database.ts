@@ -17,7 +17,6 @@ import pLimit from "p-limit";
 import * as sdk from '@defillama/sdk'
 const { sliceIntoChunks, } = sdk.util
 
-import produceKafkaTopics from "../../utils/coins3/produce";
 import { lowercase } from "../../utils/coingeckoPlatforms";
 import { sendMessage } from "../../../../defi/src/utils/discord";
 import { chainsThatShouldNotBeLowerCased } from "../../utils/shared/constants";
@@ -131,7 +130,16 @@ export async function getTokenAndRedirectDataMap(
   return map;
 }
 
-const warnedNumericKeys = new Set<string>();
+// Tracks how many times each (adapter, field, reason) tuple has fired.
+// We emit on threshold boundaries (1, 10, 100, ...) so a chronically broken
+// adapter doesn't go silent for the rest of the pod's lifetime after the first
+// warn, while still avoiding one-message-per-row spam.
+const numericWarningCounts = new Map<string, number>();
+const WARN_THRESHOLDS = [1, 10, 100, 1000, 10000];
+
+export function __resetNumericWarningsForTests(): void {
+  numericWarningCounts.clear();
+}
 
 function warnInvalidNumericField(
   value: unknown,
@@ -140,15 +148,18 @@ function warnInvalidNumericField(
   reason: string,
 ): void {
   const key = `${adapter}:${field}:${reason}`;
-  if (warnedNumericKeys.has(key)) return;
-  warnedNumericKeys.add(key);
-  const msg = `coins: addToDBWritesList[${adapter}] invalid ${field} (${reason}): ${JSON.stringify(value)} (${typeof value}). Write proceeds with coerced value; please fix the adapter to pass a finite number.`;
+  const next = (numericWarningCounts.get(key) ?? 0) + 1;
+  numericWarningCounts.set(key, next);
+  if (!WARN_THRESHOLDS.includes(next)) return;
+  const msg = `coins: addToDBWritesList[${adapter}] invalid ${field} (${reason}): ${JSON.stringify(value)} (${typeof value}); seen ${next} time(s) since startup. Write proceeds with coerced value; please fix the adapter to pass a finite number.`;
   console.error(msg);
   if (process.env.STALE_COINS_ADAPTERS_WEBHOOK) {
     sendMessage(msg, process.env.STALE_COINS_ADAPTERS_WEBHOOK, false).catch(() => {});
   }
 }
 
+function coerceNumericField(value: unknown, field: string, adapter: string, allowUndefined: true): number | undefined;
+function coerceNumericField(value: unknown, field: string, adapter: string, allowUndefined: false): number;
 function coerceNumericField(
   value: unknown,
   field: string,
@@ -156,8 +167,9 @@ function coerceNumericField(
   allowUndefined: boolean,
 ): number | undefined {
   if (value === undefined || value === null) {
-    if (!allowUndefined) warnInvalidNumericField(value, field, adapter, "missing");
-    return allowUndefined ? undefined : (Number(value) as number);
+    if (allowUndefined) return undefined;
+    warnInvalidNumericField(value, field, adapter, "missing");
+    return NaN;
   }
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) warnInvalidNumericField(value, field, adapter, "non-finite");
@@ -176,9 +188,16 @@ export function addToDBWritesList(
   confidence: number,
   redirect: string | undefined = undefined,
 ) {
+  // NOTE: warn-only by design — coerceNumericField may return NaN for
+  // decimals/confidence, which propagates into the write record. The downstream
+  // `batchWriteWithAlerts` filter (search for `isFinite(i.price)`) rejects
+  // non-finite-priced rows without a redirect; non-finite decimals/confidence
+  // are not yet filtered, matching pre-PR behaviour. Tightening that filter
+  // (and dropping non-finite numeric fields rather than writing them) is a
+  // follow-up tracked in the PR description for #11802.
   const priceNum = coerceNumericField(price, "price", adapter, true);
   const decimalsNum = coerceNumericField(decimals, "decimals", adapter, true);
-  const confidenceNum = coerceNumericField(confidence, "confidence", adapter, false)!;
+  const confidenceNum = coerceNumericField(confidence, "confidence", adapter, false);
   const PK: string =
     chain == "coingecko"
       ? `coingecko#${token.toLowerCase()}`
@@ -473,9 +492,8 @@ export async function batchWriteWithAlerts(
       (await checkMovement(items, previousItems)).filter((i: any) => isFinite(i.price) || i.redirect);
     const writeItems = [...filteredItems, ...redirectChanges]
     const ddbWriteResult = await batchWrite(writeItems, failOnError);
-    await produceKafkaTopics(writeItems as any[]);
 
-    // Dual-write: normalized PKs to DDB only (no Kafka, no alerts)
+    // Dual-write: normalized PKs to DDB only (no alerts)
     const normalizedMap = new Map<string, any>();
     writeItems.forEach((item: any) => {
       const nPK = normalizedPKFor(item.PK);

@@ -97,6 +97,8 @@ export default {
   wombat: require("./markets/wombat"),
   wombatWrapped: require("./markets/wombat"),
   backed: require("./rwa/backed"),
+  xstocks: require("./rwa/xstocks"),
+  wrappedXstocks: require("./rwa/xstocks"),
   vela: require("./yield/vela"),
   chai: require("./yield/chai"),
   kuma: require("./rwa/kuma"),
@@ -201,4 +203,6 @@ export default {
   redstone: require("./oracles/redstone"),
   navTokens: require("./rwa/navTokens"),
   safo: require("./rwa/safo"),
+  xaue: require("./rwa/xaue"),
+  dCOMP: require("./other/dCOMP"),
 };
