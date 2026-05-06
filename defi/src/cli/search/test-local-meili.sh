@@ -10,8 +10,8 @@ export SEARCH_TEST_MEILI_VERSION="${SEARCH_TEST_MEILI_VERSION:-1.9.0}"
 MEILI_HTTP_ADDR="${SEARCH_TEST_MEILI_HOST#http://}"
 MEILI_HTTP_ADDR="${MEILI_HTTP_ADDR#https://}"
 
-if [[ -z "${SEARCH_MASTER_KEY:-}" && -z "${INTERNAL_API_KEY:-}" && -z "${APP_ENV:-}" ]]; then
-  echo "Set SEARCH_MASTER_KEY, INTERNAL_API_KEY, or APP_ENV=/path/to/.env before running this test."
+if [[ -z "${SEARCH_MASTER_KEY:-}" && -z "${APP_ENV:-}" ]]; then
+  echo "Set SEARCH_MASTER_KEY or APP_ENV=/path/to/.env before running this test."
   exit 1
 fi
 

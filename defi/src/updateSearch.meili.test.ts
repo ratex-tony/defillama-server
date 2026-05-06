@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 import dotenv from "dotenv";
-import { PAGES_INDEX_SETTINGS, generateSearchList } from "./updateSearch";
+import { PAGES_INDEX_SETTINGS } from "./updateSearch";
 
 if (process.env.APP_ENV) dotenv.config({ path: process.env.APP_ENV, override: false });
 
@@ -9,7 +9,6 @@ const describeSearch = shouldRun ? describe : describe.skip;
 const host = process.env.SEARCH_TEST_MEILI_HOST ?? "http://127.0.0.1:7700";
 const key = process.env.SEARCH_TEST_MEILI_KEY ?? "masterKey";
 const prodHost = process.env.SEARCH_PROD_MEILI_HOST ?? "https://search-core.defillama.com";
-const dataSource = process.env.SEARCH_TEST_DATA_SOURCE ?? (process.env.SEARCH_MASTER_KEY ? "prod" : "generated");
 const index = `test_pages_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
 if (shouldRun) jest.setTimeout(300_000);
@@ -45,7 +44,7 @@ const SEARCH_CASES: SearchCase[] = [
   { query: "cap", firstRoute: "/protocol/cap", routesWithinRank: [{ route: "/token/CAP", maxRank: 15 }] },
   {
     query: "usdt",
-    ...(dataSource === "prod" ? { firstRoute: "/stablecoin/tether" } : {}),
+    firstRoute: "/stablecoin/tether",
     routesWithinRank: [{ route: "/stablecoin/tether", maxRank: 5 }, { route: "/token/USDT", maxRank: 10 }],
   },
   { query: "usdc", firstRoute: "/stablecoin/usd-coin", routesWithinRank: [{ route: "/token/USDC", maxRank: 10 }] },
@@ -120,20 +119,10 @@ async function getProdPagesDocuments() {
 }
 
 async function getSearchDocuments() {
-  if (dataSource === "prod") {
-    if (!process.env.SEARCH_MASTER_KEY) {
-      throw new Error("Set SEARCH_MASTER_KEY or run with SEARCH_TEST_DATA_SOURCE=generated");
-    }
-    return getProdPagesDocuments();
+  if (!process.env.SEARCH_MASTER_KEY) {
+    throw new Error("Set SEARCH_MASTER_KEY or APP_ENV pointing to an env file before running search tests");
   }
-  if (dataSource === "generated") {
-    if (!process.env.INTERNAL_API_KEY) {
-      throw new Error("Set INTERNAL_API_KEY or APP_ENV pointing to an env file before running generated search tests");
-    }
-    const { results } = await generateSearchList();
-    return results;
-  }
-  throw new Error(`Unsupported SEARCH_TEST_DATA_SOURCE: ${dataSource}`);
+  return getProdPagesDocuments();
 }
 
 describeSearch("search results in Meilisearch", () => {

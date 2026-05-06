@@ -21,7 +21,7 @@ export APP_ENV=/Users/mint/p/defillama-server/defi/.env
 npm run test:search
 ```
 
-The env file should include `SEARCH_MASTER_KEY`, `TASTY_API_URL`, `TASTY_API_KEY`, and `INTERNAL_API_KEY`.
+The test suite always uses production search documents as the data source, so the env file must include `SEARCH_MASTER_KEY`.
 
 To run against the prod Meilisearch host with a temporary test index:
 
