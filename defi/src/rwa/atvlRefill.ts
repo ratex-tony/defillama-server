@@ -26,7 +26,7 @@ import { initPG, fetchLatestAggregateTotals } from "./db";
 import { fetchEvm, fetchSolana, fetchProvenance, fetchStellar, type WalletEntry } from './balances';
 import { excludedProtocolCategories, protocolIdMap, categoryMap, unsupportedChains, ONCHAIN_MCAP_EQUALS_ACTIVE_PLATFORMS } from "./constants";
 import { RWA_KEY_MAP } from "./metadataConstants";
-import { createAirtableHeaderToCanonicalKeyMapper, fetchBurnAddresses, normalizeRwaMetadataForApiInPlace, sortTokensByChain, toFiniteNumberOrNull, toFixedNumber } from "./utils";
+import { createAirtableHeaderToCanonicalKeyMapper, fetchBurnAddresses, formatNumAsNumber, normalizeRwaMetadataForApiInPlace, sortTokensByChain, toFiniteNumberOrNull, toFixedNumber } from "./utils";
 import { sendMessage } from "../utils/discord";
 
 // ── Internal helpers (copied from atvl.ts — identical logic) ────────
