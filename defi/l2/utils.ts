@@ -130,8 +130,9 @@ async function getAptosSupplies(tokens: string[], timestamp?: number): Promise<{
           const res = await fetch(
             `${rpc}/v1/accounts/${accountAddr}/resource/0x1::coin::CoinInfo%3C${token}%3E`
           ).then((r) => r.json());
-          if (res?.data?.supply?.vec?.[0]?.integer?.vec?.[0]?.value != null) {
-            supplies[`aptos:${token}`] = res.data.supply.vec[0].integer.vec[0].value;
+          const legacyValue = res?.data?.supply?.vec?.[0]?.integer?.vec?.[0]?.value;
+          if (legacyValue != null) {
+            supplies[`aptos:${token}`] = Number(legacyValue);
             return;
           }
           if (res?.data?.supply?.vec?.[0]?.aggregator?.vec?.[0]?.handle) {
@@ -443,7 +444,7 @@ async function getEVMSupplies(
               await sleep(1000);
               if (chain == "tron") console.log(`${target}:: \t ${e.message}`);
             });
-            if (res)
+            if (res != null)
               supplies[`${chain}:${bridgedTvlMixedCaseChains.includes(chain) ? target : target.toLowerCase()}`] = res;
           });
       } catch (e) {

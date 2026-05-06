@@ -7,7 +7,7 @@ import { z } from 'zod';
 export const rwaPerpsMarketSchema = z
   .object({
     id: z.string(),
-    timestamp: z.number(),
+    timestamp: z.number().int().nonnegative(),
     contract: z.string(),
     venue: z.string(),
     openInterest: z.number().finite(),
@@ -67,7 +67,7 @@ export const rwaPerpsFilterResponseSchema = z.array(rwaPerpsMarketSchema);
 
 export const rwaPerpsChartPointSchema = z
   .object({
-    timestamp: z.number(),
+    timestamp: z.number().int().nonnegative(),
   })
   .passthrough();
 
@@ -79,7 +79,7 @@ export const rwaPerpsChartResponseSchema = z.array(rwaPerpsChartPointSchema);
 
 export const rwaPerpsFundingPointSchema = z
   .object({
-    timestamp: z.number(),
+    timestamp: z.number().int().nonnegative(),
     id: z.string(),
   })
   .passthrough();

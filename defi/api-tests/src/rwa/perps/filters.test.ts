@@ -113,7 +113,7 @@ describe('RWA Perps API - Filter by Asset Group', () => {
       endpoints.RWA_PERPS.ASSET_GROUP(assetGroup)
     );
     expectSuccessfulResponse(response);
-    expect(Array.isArray(response.data)).toBe(true);
+    expectNonEmptyArray(response.data);
   });
 
   it('should succeed with an empty array for an unknown assetGroup', async () => {
