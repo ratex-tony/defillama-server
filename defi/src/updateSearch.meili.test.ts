@@ -26,7 +26,7 @@ interface SearchCase {
   query: string;
   firstRoute?: string;
   blockedSubNames?: string[];
-  topRoutes?: Array<{ route: string; maxRank: number }>;
+  routesWithinRank?: Array<{ route: string; maxRank: number }>;
 }
 
 const SEARCH_CASES: SearchCase[] = [
@@ -35,19 +35,23 @@ const SEARCH_CASES: SearchCase[] = [
   { query: "holders-revenue", firstRoute: "/holders-revenue", blockedSubNames: ["Holders Revenue"] },
   { query: "mcap", blockedSubNames: ["Mcap"] },
   { query: "tvl", blockedSubNames: ["TVL"] },
-  { query: "aave", firstRoute: "/protocol/aave", topRoutes: [{ route: "/protocol/aave?tvl=false&fees=true", maxRank: 15 }] },
+  {
+    query: "aave",
+    firstRoute: "/protocol/aave",
+    routesWithinRank: [{ route: "/protocol/aave?tvl=false&fees=true", maxRank: 15 }],
+  },
   { query: "stabble", firstRoute: "/protocol/stabble" },
   { query: "markit", firstRoute: "/protocol/markit" },
-  { query: "cap", firstRoute: "/protocol/cap", topRoutes: [{ route: "/token/CAP", maxRank: 15 }] },
+  { query: "cap", firstRoute: "/protocol/cap", routesWithinRank: [{ route: "/token/CAP", maxRank: 15 }] },
   {
     query: "usdt",
     ...(dataSource === "prod" ? { firstRoute: "/stablecoin/tether" } : {}),
-    topRoutes: [{ route: "/stablecoin/tether", maxRank: 5 }, { route: "/token/USDT", maxRank: 10 }],
+    routesWithinRank: [{ route: "/stablecoin/tether", maxRank: 5 }, { route: "/token/USDT", maxRank: 10 }],
   },
-  { query: "usdc", firstRoute: "/stablecoin/usd-coin", topRoutes: [{ route: "/token/USDC", maxRank: 10 }] },
-  { query: "eth", topRoutes: [{ route: "/token/ETH", maxRank: 5 }] },
-  { query: "sol", topRoutes: [{ route: "/token/SOL", maxRank: 5 }] },
-  { query: "mega", topRoutes: [{ route: "/token/MEGA", maxRank: 5 }] },
+  { query: "usdc", firstRoute: "/stablecoin/usd-coin", routesWithinRank: [{ route: "/token/USDC", maxRank: 10 }] },
+  { query: "eth", routesWithinRank: [{ route: "/token/ETH", maxRank: 5 }] },
+  { query: "sol", routesWithinRank: [{ route: "/token/SOL", maxRank: 5 }] },
+  { query: "mega", routesWithinRank: [{ route: "/token/MEGA", maxRank: 2 }] },
 ];
 
 async function meiliRequest(baseUrl: string, bearerToken: string | undefined, path: string, options: any = {}) {
@@ -165,7 +169,7 @@ describeSearch("search results in Meilisearch", () => {
     }
   });
 
-  test.each(SEARCH_CASES)("$query", async ({ query, firstRoute, blockedSubNames, topRoutes }) => {
+  test.each(SEARCH_CASES)("$query", async ({ query, firstRoute, blockedSubNames, routesWithinRank }) => {
     const hits = await search(query);
 
     if (firstRoute) expect(hits[0]?.route).toBe(firstRoute);
@@ -175,7 +179,7 @@ describeSearch("search results in Meilisearch", () => {
       expect(subpageHit).toBeUndefined();
     }
 
-    for (const expected of topRoutes ?? []) {
+    for (const expected of routesWithinRank ?? []) {
       const rank = hits.findIndex((hit) => hit.route === expected.route) + 1;
       expect(rank).toBeGreaterThan(0);
       expect(rank).toBeLessThanOrEqual(expected.maxRank);
