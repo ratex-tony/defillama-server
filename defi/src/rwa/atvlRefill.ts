@@ -26,7 +26,7 @@ import { initPG, fetchLatestAggregateTotals } from "./db";
 import { fetchEvm, fetchSolana, fetchProvenance, fetchStellar, type WalletEntry } from './balances';
 import { excludedProtocolCategories, protocolIdMap, categoryMap, unsupportedChains, ONCHAIN_MCAP_EQUALS_ACTIVE_PLATFORMS } from "./constants";
 import { RWA_KEY_MAP } from "./metadataConstants";
-import { createAirtableHeaderToCanonicalKeyMapper, fetchBurnAddresses, formatNumAsNumber, normalizeRwaMetadataForApiInPlace, sortTokensByChain, toFiniteNumberOrNull, toFixedNumber } from "./utils";
+import { createAirtableHeaderToCanonicalKeyMapper, fetchBurnAddresses, normalizeRwaMetadataForApiInPlace, sortTokensByChain, toFiniteNumberOrNull, toFixedNumber } from "./utils";
 import { sendMessage } from "../utils/discord";
 
 // ── Internal helpers (copied from atvl.ts — identical logic) ────────
@@ -327,7 +327,7 @@ function getOnChainTvlAndActiveMcaps(
     // stablecoins API), fall through to the on-chain path so we don't drop coverage.
     if (cgId && stablecoinsData[cgId] && stablecoinsData[cgId][chainDisplayName] != null) {
       if (!finalData[rwaId][RWA_KEY_MAP.price] && assetPrices[pk]?.price) {
-        finalData[rwaId][RWA_KEY_MAP.price] = formatNumAsNumber(assetPrices[pk].price);
+        finalData[rwaId][RWA_KEY_MAP.price] = toFiniteNumberOrNull(assetPrices[pk].price);
       }
       const stablePrice = assetPrices[pk]?.price;
       const stableMcap = Number(stablecoinsData[cgId][chainDisplayName]);
@@ -342,6 +342,12 @@ function getOnChainTvlAndActiveMcaps(
     }
 
     const { price, decimals } = assetPrices[pk];
+    // Write price independently of supply: a missing supply (e.g. RPC failure for an
+    // Aptos FA) shouldn't blank out a price we already have from coins.
+    if (price && !finalData[rwaId][RWA_KEY_MAP.price]) {
+      finalData[rwaId][RWA_KEY_MAP.price] = toFiniteNumberOrNull(price);
+    }
+
     const supply = totalSupplies[pk];
     // null = fetch failed → skip (don't fabricate or wipe existing data).
     // 0 / any number = real reading → fall through; 0 produces an explicit 0
@@ -349,10 +355,6 @@ function getOnChainTvlAndActiveMcaps(
     if (supply == null || !price) {
       if (process.env.DEBUG_ENABLED) console.error(`No supply or price for ${pk}`);
       return;
-    }
-
-    if (!finalData[rwaId][RWA_KEY_MAP.price]) {
-      finalData[rwaId][RWA_KEY_MAP.price] = formatNumAsNumber(price);
     }
 
     try {
@@ -434,7 +436,7 @@ function findActiveMcaps(
   chain: string
 ) {
   if (!finalData[rwaId][RWA_KEY_MAP.price]) {
-    finalData[rwaId][RWA_KEY_MAP.price] = formatNumAsNumber(assetPrices.price);
+    finalData[rwaId][RWA_KEY_MAP.price] = toFiniteNumberOrNull(assetPrices.price);
   }
   if (!finalData[rwaId][RWA_KEY_MAP.activeMcap][chain]) return;
   if (!(rwaId in excludedAmounts)) return;

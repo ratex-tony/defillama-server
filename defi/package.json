@@ -51,6 +51,7 @@
     "run-governance": "npx ts-node --logError --transpile-only src/governance/test.ts",
     "cron-tvl": "npx ts-node --logError --transpile-only src/api2/cron-task/index.ts",
     "cron-dimensions": "export AWS_REGION='eu-central-1' && export tableName='prod-table' && npx  --node-options='--max-old-space-size=20144' ts-node --logError --transpile-only src/api2/cron-task/dimensions.ts",
+    "cron-reconcile-dimensions": "export AWS_REGION='eu-central-1' && export tableName='prod-table' && npx --node-options='--max-old-space-size=20144' ts-node --logError --transpile-only src/api2/cron-task/reconcileDimensions.ts",
     "cron-raises": "npx ts-node --logError --transpile-only src/api2/cron-task/raises.ts",
     "cron-app-metadata": "npx ts-node --logError --transpile-only src/api2/cron-task/appMetadata.ts",
     "cron-cex": "npx ts-node --logError --transpile-only src/api2/cron-task/cex.ts",

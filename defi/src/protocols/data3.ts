@@ -2930,6 +2930,9 @@ const data3_0: Protocol[] = [
     audit_links: ["https://github.com/RockX-SG/stake/blob/main/PeckShield-Audit-Report-RockXStaking-v1.0.pdf"],
     parentProtocol: "parent#bedrock",
     listedAt: 1681516422,
+    dimensions: {
+      fees: "bedrock-unieth"
+    }
   },
   {
     id: "2833",
@@ -5031,16 +5034,16 @@ const data3_0: Protocol[] = [
     deadUrl: true,  },
   {
     id: "2928",
-    name: "Veax",
+    name: "Veax CLMM",
     address: null,
     symbol: "VEAX",
     url: "https://veax.com/",
     description:
       "Veax is a pioneering DEX built on NEAR Protocol that offers users an easy way to maximize their profits with a comprehensive suite of features such as single-sided liquidity, concentrated liquidity, and multiple fee levels.",
     chain: "Near",
-    logo: `${baseIconsUrl}/veax.png`,
+    logo: `${baseIconsUrl}/veax-clmm.jpg`,
     audits: "2",
-    gecko_id: "veax",
+    gecko_id: null,
     cmcId: null,
     tags: ["CLMM"],
     chains: ["Near"],
@@ -8754,7 +8757,8 @@ const data3_0: Protocol[] = [
     parentProtocol: "parent#sudoswap",
     listedAt: 1686344795,
     dimensions: {
-      fees: "sudoswap-v2"
+      fees: "sudoswap-v2",
+      dexs: "sudoswap-v2"
     }
   },
   {
@@ -15087,7 +15091,8 @@ const data3_0: Protocol[] = [
     parentProtocol: "parent#friend-tech",
     listedAt: 1692204447,
     dimensions: {
-      fees: "friend-tech"
+      fees: "friend-tech",
+      dexs: "friend-tech"
     }
   },
   {
@@ -24315,6 +24320,9 @@ const data3_1: Protocol[] = [
     twitter: "Bedrock_DeFi",
     audit_links: ["https://github.com/RockX-SG/uniiotx/blob/main/docs/PeckShield-Audit-Report-Bedrock-v1.0.pdf"],
     parentProtocol: "parent#bedrock",
+    dimensions: {
+      fees: "bedrock-uniiotx"
+    },
     listedAt: 1700221805,
   },
   {
@@ -24547,7 +24555,6 @@ const data3_1: Protocol[] = [
     module: "coupon-finance/index.js",
     twitter: "CouponFinance",
     audit_links: ["https://docs.coupon.finance/etc/audit"],
-    github: ["clober-dex"],
     listedAt: 1700489895,
   },
   {
@@ -33380,6 +33387,10 @@ const data3_2: Protocol[] = [
     module: "dinari/index.js",
     twitter: "DinariGlobal",
     listedAt: 1709208650,
+    dimensions: {
+      fees: "dinari",
+      dexs: "dinari"
+    }
   },
   {
     id: "4197",
@@ -34881,14 +34892,14 @@ const data3_2: Protocol[] = [
     symbol: "-",
     url: "https://www.gaming-dex.com",
     description:
-      "Gaming DEX is a DeFi infrastructure protocol that provides token liquidity.It will be implemented on DeFi Verse, a Blockchain for Games-related Oasys Layer 2 blockchain.",
+      "Gaming DEX is a DeFi infrastructure protocol that provides token liquidity. It is implemented on Oasys and megaETH.",
     chain: "DeFiVerse",
     logo: `${baseIconsUrl}/gaming-dex.jpg`,
     audits: "0",
     gecko_id: null,
     cmcId: null,
     tags: ["Weighted Pool AMM"],
-    chains: ["DeFiVerse"],
+    chains: ["DeFiVerse", "Oasys", "MegaETH"],
     module: "gaming-dex/index.js",
     twitter: "GamingDEX_Oasys",
     forkedFromIds: ["2611"],
@@ -48183,20 +48194,21 @@ const data3_3: Protocol[] = [
   },
   {
     id: "4867",
-    name: "LayerZero",
+    name: "LayerZero V2",
     address: "ethereum:0x6985884c4392d348587b19cb9eaaf157f13271cd",
     symbol: "ZRO",
     url: "https://layerzero.network/",
     description:
       "LayerZero is a technology that enables applications to move data across blockchains, uniquely supporting censorship-resistant messages and permissionless development through immutable smart contracts.",
     chain: "Ethereum",
-    logo: `${baseIconsUrl}/layerzero.jpg`,
-    gecko_id: "layerzero",
-    cmcId: "26997",
+    logo: `${baseIconsUrl}/layerzero-v2.jpg`,
+    gecko_id: null,
+    cmcId: null,
     category: "Bridge",
     chains: ["Ethereum"],
     module: "dummy.js",
-    twitter: "LayerZero_Labs",
+    twitter: "LayerZero_Core",
+    parentProtocol: "parent#layerzero",
     dimensions: {
       fees: "layerzero",
     }
@@ -52543,7 +52555,7 @@ const data3_3: Protocol[] = [
     description: "Execution Infrastructure for On-Chain Trading.",
     chain: "Sei",
     logo: `${baseIconsUrl}/saphyre-v3.jpg`,
-    audits: "0",
+    audits: "2",
     gecko_id: null,
     cmcId: null,
     tags: ["CLMM"],
@@ -52552,6 +52564,7 @@ const data3_3: Protocol[] = [
     module: "dragonswap-sei-v3/index.js",
     twitter: "Saphyre_xyz",
     parentProtocol: "parent#dragon-swap",
+    audit_links: ["https://saphyre.xyz/audits"],
     listedAt: 1724854633,
     dimensions: {
       fees: "dragonswap-sei-v3",
@@ -52751,7 +52764,8 @@ const data3_3: Protocol[] = [
         adapter: "helix-helix-perp",
         genuineSpikes: [["2025-09-29", "-"]],
       },
-      "open-interest": "helix-helix-perp"
+      "open-interest": "helix-helix-perp",
+      fees: "helix-helix-perp",
     }
   },
   {
@@ -57528,7 +57542,10 @@ const data3_3: Protocol[] = [
     module: "bedrock/index.js",
     twitter: "Bedrock_DeFi",
     parentProtocol: "parent#bedrock",
-    listedAt: 1730219911
+    listedAt: 1730219911,
+    dimensions: {
+      fees: "bedrock-unibtc"
+    }
   },
   {
     id: "5296",
@@ -60589,7 +60606,11 @@ const data3_3: Protocol[] = [
     twitter: "ubeswap",
     forkedFromIds: ["2198"],
     parentProtocol: "parent#ubeswap",
-    listedAt: 1732790969
+    listedAt: 1732790969,
+    dimensions: {
+      fees: "ubeswap-v3",
+      dexs: "ubeswap-v3",
+    }
   },
   {
     id: "5433",

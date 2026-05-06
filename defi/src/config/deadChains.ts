@@ -12,6 +12,7 @@ export const deadChains = [
   'inevm',
   'fluence',
   'sx',  // deprecated in favor of sx rollup?
+  'titan',  // https://tokenize.exchange/ the entity behind it is insolvent?
   'mint', // shutdown 2026-04-17: https://x.com/Mint_Blockchain/status/2044980026819617147
 ]
 

@@ -18,7 +18,6 @@ import { runWithRuntimeLogging } from "../utils";
 import { TagCatetgoryMap } from "../../protocols/tags";
 import { sendMessage } from "../../utils/discord";
 import { sluggifyCategoryString } from "../../utils/sluggify";
-const { exec } = require("child_process");
 
 const allExtraSections = [...extraSections, "doublecounted", "liquidstaking", "dcAndLsOverlap", "excludeParent"];
 
@@ -84,30 +83,12 @@ export async function storeAppMetadata() {
   console.time("storeAppMetadata");
   console.log("starting to build metadata for front-end");
   try {
-    // await pullRaisesDataIfMissing();  // not needed anymore as raises data is always updated before this line is invoked
     await _storeAppMetadata();
   } catch (e) {
     console.log("Error in storeAppMetadata: ", e);
     console.error(e);
   }
   console.timeEnd("storeAppMetadata");
-}
-
-async function pullRaisesDataIfMissing() {
-  const raises = await readRouteData("/raises");
-  if (!raises) {
-    await new Promise((resolve, reject) => {
-      exec("npm run cron-raises", (error: any, stdout: any, stderr: any) => {
-        if (error) {
-          console.error(`exec error: ${error}`);
-          return reject(error);
-        }
-        console.log(`stdout: ${stdout}`);
-        console.error(`stderr: ${stderr}`);
-        resolve(stdout);
-      });
-    });
-  }
 }
 
 async function _storeAppMetadata() {
@@ -223,6 +204,8 @@ async function _storeAppMetadata() {
   await notifyMissingChainIds(missingChainIds);
 
   async function _storeMetadataFile() {
+    const yieldProjects = new Set(yieldsData.map((pool: any) => pool.project));
+
     for (const chain of tvlData.chains) {
       finalChains[slug(chain)] = { name: chain, id: chain };
     }
@@ -244,7 +227,7 @@ async function _storeAppMetadata() {
         tvl: hasTvl,
         inflows: hasInflows,
         ...(hasBorrowed ? { borrowed: true } : {}),
-        yields: yieldsData.find((pool: any) => pool.project === slugName) ? true : false,
+        yields: yieldProjects.has(slugName),
         ...(protocol.governanceID ? { governance: true } : {}),
         ...(forksData.forks[protocol.name] ? { forks: true } : {}),
       };
@@ -283,13 +266,10 @@ async function _storeAppMetadata() {
       }
       const { name: _, ...rest } = finalProtocols[protocol.id];
       const slugName: string = slug(protocol.name);
+      const childProtocols = parentToChildProtocols[protocol.id] ?? [];
       finalProtocols[protocol.id] = {
         name: slugName,
-        yields: yieldsData.find(
-          (pool: any) => pool.project === slugName || parentToChildProtocols[protocol.id]?.includes(pool.project)
-        )
-          ? true
-          : false,
+        yields: yieldProjects.has(slugName) || childProtocols.some((child: string) => yieldProjects.has(child)),
         ...rest,
         ...(protocol.governanceID ? { governance: true } : {}),
         ...(forksData.forks[protocol.name] ? { forks: true } : {}),

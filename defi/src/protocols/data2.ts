@@ -501,7 +501,6 @@ const data2: Protocol[] = [
     ],
     listedAt: 1644685001,
     governanceID: ["snapshot:moonwell-apollo-governance.eth"],
-    github: ["moonwell-fi"],
     dimensions: {
       fees: "moonwell-apollo"
     }
@@ -1553,6 +1552,7 @@ const data2: Protocol[] = [
     listedAt: 1645572803,
     github: ["impactMarket"],
     deadUrl: true,
+    deprecated: true
   },
   {
     id: "1450",
@@ -9308,7 +9308,7 @@ const data2: Protocol[] = [
     url: "https://www.zeta.markets",
     description: "Zeta Markets is the premier derivatives protocol on Solana.",
     chain: "Solana",
-    logo: `${baseIconsUrl}/zeta.png`,
+    logo: `${baseIconsUrl}/zeta.jpg`,
     audits: "0",
     gecko_id: "zeta",
     cmcId: "32002",
@@ -9318,7 +9318,8 @@ const data2: Protocol[] = [
     module: "zeta/index.js",
     twitter: "ZetaMarkets",
     listedAt: 1654452112,
-    github: ["zetamarkets"],
+    deprecated: true,
+    parentProtocol: "parent#bullet",
     dimensions: {
       derivatives: "zeta"
     }
@@ -9870,7 +9871,6 @@ const data2: Protocol[] = [
     audit_links: ["https://gfx.cafe/ip/contracts/-/blob/master/audit/GFX_IP_Protocol_Audit_Report.pdf"],
     listedAt: 1655545050,
     stablecoins: ["interest-protocol"],
-    github: ["interest-protocol"],
   },
   {
     id: "1830",
@@ -17050,7 +17050,7 @@ const data2: Protocol[] = [
     gecko_id: null,
     cmcId: null,
     tags: ["AMM"],
-    chains: ["Polygon", "Kava", "Metis", "Optimism"],
+    chains: ["Polygon", "Metis", "Optimism"],
     module: "sushiswap-trident/index.js",
     twitter: "SushiSwap",
     parentProtocol: "parent#sushi",
@@ -19575,7 +19575,8 @@ const data2: Protocol[] = [
     parentProtocol: "parent#helix",
     listedAt: 1668004664,
     dimensions: {
-      dexs: "helix-helix"
+      dexs: "helix-helix",
+      fees: "helix-helix"
     }
   },
   {
@@ -22936,7 +22937,8 @@ const data2: Protocol[] = [
     listedAt: 1672970801,
     parentProtocol: "parent#blur",
     dimensions: {
-      fees: "blur"
+      fees: "blur",
+      dexs: "blur"
     }
   },
   {
@@ -23410,7 +23412,7 @@ const data2: Protocol[] = [
     twitter: "Arcade_xyz",
     audit_links: ["https://docs.arcade.xyz/docs/audit-reports"],
     listedAt: 1673781145,
-    github: ["arcadexyz", "PawnFi"],
+    github: ["arcadexyz"],
   },
   /*
   {
