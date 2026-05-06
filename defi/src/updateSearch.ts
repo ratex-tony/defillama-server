@@ -83,8 +83,8 @@ interface TokenSearchData {
 
 export const SEARCH_RANK = {
   // Higher `r` wins after textual relevance. Keep navigation pages above
-  // entities for exact aliases like "yields", while subpages stay below their
-  // parent entity unless the query specifically matches the subpage text.
+  // entities for exact aliases like "yields", while subpages stay below parent
+  // entities and are found through parent names rather than generic tab names.
   navPage: 4,
   entity: 3,
   collection: 2,
@@ -129,7 +129,6 @@ export const PAGES_INDEX_SETTINGS = {
     "previousNames",
     "nameVariants",
     "keywords",
-    "subName",
   ],
   rankingRules: ["words", "typo", "proximity", "exactness", "r:desc", "attribute", "v:desc", "sort"],
   filterableAttributes: ["type", "deprecated", "subName"],

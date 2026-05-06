@@ -12,12 +12,13 @@ import {
 } from "./updateSearch";
 
 describe("search index settings", () => {
-  it("searches route aliases before names and sub names", () => {
+  it("searches route aliases before names and keeps subpage labels display-only", () => {
     const attrs = PAGES_INDEX_SETTINGS.searchableAttributes;
 
     expect(attrs).toContain("routeAlias");
     expect(attrs.indexOf("routeAlias")).toBeLessThan(attrs.indexOf("name"));
-    expect(attrs.indexOf("routeAlias")).toBeLessThan(attrs.indexOf("subName"));
+    expect(attrs).not.toContain("subName");
+    expect(PAGES_INDEX_SETTINGS.displayedAttributes).toContain("subName");
   });
 
   it("keeps exactness before business ranking", () => {
@@ -25,6 +26,7 @@ describe("search index settings", () => {
 
     expect(rules.indexOf("exactness")).toBeLessThan(rules.indexOf("r:desc"));
     expect(rules.indexOf("r:desc")).toBeLessThan(rules.indexOf("attribute"));
+    expect(rules.indexOf("v:desc")).toBeLessThan(rules.indexOf("sort"));
   });
 
   it("supports frontend entity filters", () => {
@@ -158,10 +160,12 @@ describe("entity and subpage search docs", () => {
     });
 
     expect(subPages.find((page) => page.subName === "Fees")).toMatchObject({
+      name: "MarkIt",
       route: "/protocol/markit?tvl=false&fees=true",
       r: SEARCH_RANK.subPage,
     });
     expect(subPages.find((page) => page.subName === "Revenue")).toMatchObject({
+      name: "MarkIt",
       route: "/protocol/markit?tvl=false&revenue=true",
       r: SEARCH_RANK.subPage,
     });

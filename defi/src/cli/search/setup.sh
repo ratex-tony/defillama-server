@@ -38,8 +38,7 @@ curl \
     "symbol",
     "previousNames",
     "nameVariants",
-    "keywords",
-    "subName"
+    "keywords"
   ]'
 
 curl \
