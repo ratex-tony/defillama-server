@@ -813,7 +813,7 @@ export function buildDirectoryResults(
   return allResults;
 }
 
-async function generateSearchList() {
+export async function generateSearchList() {
   const endAt = Date.now();
   const startAt = endAt - 1000 * 60 * 60 * 24 * 90;
   // Fetch all source datasets up front. The important split:
