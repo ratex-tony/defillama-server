@@ -254,7 +254,15 @@ async function fetchHistoricalStablecoins(
   // (e.g. peggedRUB rows store RUB, not USD — unlike /stablecoins which has
   // already been multiplied by USD price). Divide by the FX rate at the
   // requested timestamp so downstream RWA mcap is dollar-denominated.
-  const fxRates = await getFxRates();
+  // If the global rates payload is unavailable (e.g. S3 hiccup), fall through
+  // with an empty list — non-USD pegs hit the per-asset skip below, USD pegs
+  // are unaffected — rather than failing the whole ATVL run.
+  let fxRates: Array<{ date: number; rates: Record<string, number> }> = [];
+  try {
+    fxRates = await getFxRates();
+  } catch (e) {
+    console.error("[atvl] FX rates unavailable, skipping non-USD peg overrides", e);
+  }
 
   await runInPromisePool({
     items: validStablecoinIds,
