@@ -247,7 +247,7 @@ async function getSolanaTokenSupply(
     try {
       const buffer = data.data.slice(36, 44);
       const supply = solanaMintLayout.decode(buffer).supply.toString();
-      supplies[key] = supply as any;
+      supplies[key] = Number(supply);
     } catch (e) {
       sdk.log(`Error decoding account: ${filteredTokens[idx]}`);
     }

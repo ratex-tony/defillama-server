@@ -198,6 +198,10 @@ const CSV = arg("--csv");
 const FROM_DATE = arg("--from-date");
 const FLAT_NAV_RAW = arg("--flat-nav");
 const FLAT_NAV = FLAT_NAV_RAW != null ? Number(FLAT_NAV_RAW) : null;
+if (FLAT_NAV_RAW != null && (!Number.isFinite(FLAT_NAV) || (FLAT_NAV as number) <= 0)) {
+  console.error(`ERROR: --flat-nav "${FLAT_NAV_RAW}" must be a positive number`);
+  process.exit(1);
+}
 const DRY_RUN = process.argv.includes("--dry-run");
 const NO_PREVIEW = process.argv.includes("--no-preview");
 const OUT = arg("--out") ?? `./preview-${ASSET_ID ?? "rwa"}.html`;
@@ -206,12 +210,17 @@ if (!ASSET_ID || !MINT || !CSV) {
   console.error("ERROR: --asset-id, --mint, --csv are all required");
   process.exit(1);
 }
-const FROM_TS = FROM_DATE ? Math.floor(Date.UTC(
-  Number(FROM_DATE.slice(0, 4)),
-  Number(FROM_DATE.slice(5, 7)) - 1,
-  Number(FROM_DATE.slice(8, 10))
-) / 1000) : null;
-if (FROM_DATE && !Number.isFinite(FROM_TS)) {
+
+// Reject malformed/out-of-range YYYY-MM-DD: Date.UTC silently rolls e.g. Feb 31 → Mar 3.
+function parseIsoDayUtc(day: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const [y, m, d] = day.split("-").map(Number);
+  const ts = Math.floor(Date.UTC(y, m - 1, d) / 1000);
+  if (!Number.isFinite(ts)) return null;
+  return new Date(ts * 1000).toISOString().slice(0, 10) === day ? ts : null;
+}
+const FROM_TS = FROM_DATE ? parseIsoDayUtc(FROM_DATE) : null;
+if (FROM_DATE && FROM_TS == null) {
   console.error(`ERROR: --from-date "${FROM_DATE}" is not a valid YYYY-MM-DD date`);
   process.exit(1);
 }
@@ -383,8 +392,9 @@ async function commitWrites(writes: PlannedWrite[]) {
   // Path A: full set → write mcap + activemcap + totalsupply + aggregates.
   // updateOnDuplicate intentionally EXCLUDES defiactivetvl/aggregatedefiactivetvl/timestamp_actual.
   if (fullSet.length > 0) {
-    const rows = fullSet.map((w) => ({
+    const dailyRows = fullSet.map((w) => ({
       timestamp: w.dayTs,
+      timestamp_actual: w.dayTs,
       id: ASSET_ID!,
       mcap: JSON.stringify(w.newMcap),
       activemcap: JSON.stringify(w.newActiveMcap),
@@ -394,15 +404,17 @@ async function commitWrites(writes: PlannedWrite[]) {
       created_at: now,
       updated_at: now,
     }));
+    const backupRows = dailyRows.map(({ timestamp_actual, ...row }) => row);
     const upd = ["mcap", "activemcap", "totalsupply", "aggregatemcap", "aggregatedactivemcap", "updated_at"];
-    await DAILY_RWA_DATA.bulkCreate(rows as any[], { updateOnDuplicate: upd });
-    await BACKUP_RWA_DATA.bulkCreate(rows as any[], { updateOnDuplicate: upd });
+    await DAILY_RWA_DATA.bulkCreate(dailyRows as any[], { updateOnDuplicate: upd });
+    await BACKUP_RWA_DATA.bulkCreate(backupRows as any[], { updateOnDuplicate: upd });
   }
 
   // Path B: only totalsupply → narrow updateOnDuplicate so we don't touch mcap.
   if (onlyTotalSupply.length > 0) {
-    const rows = onlyTotalSupply.map((w) => ({
+    const dailyRows = onlyTotalSupply.map((w) => ({
       timestamp: w.dayTs,
+      timestamp_actual: w.dayTs,
       id: ASSET_ID!,
       mcap: JSON.stringify(w.newMcap),         // unchanged values, but bulkCreate needs all PK + included cols
       activemcap: JSON.stringify(w.newActiveMcap),
@@ -412,9 +424,10 @@ async function commitWrites(writes: PlannedWrite[]) {
       created_at: now,
       updated_at: now,
     }));
+    const backupRows = dailyRows.map(({ timestamp_actual, ...row }) => row);
     const upd = ["totalsupply", "updated_at"];
-    await DAILY_RWA_DATA.bulkCreate(rows as any[], { updateOnDuplicate: upd });
-    await BACKUP_RWA_DATA.bulkCreate(rows as any[], { updateOnDuplicate: upd });
+    await DAILY_RWA_DATA.bulkCreate(dailyRows as any[], { updateOnDuplicate: upd });
+    await BACKUP_RWA_DATA.bulkCreate(backupRows as any[], { updateOnDuplicate: upd });
   }
 }
 

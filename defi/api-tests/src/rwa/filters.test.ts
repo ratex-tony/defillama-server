@@ -90,7 +90,8 @@ describe('RWA API - Filter by Asset Group', () => {
 
   it('should return RWAs filtered by assetGroup', async () => {
     const assetGroups = listResponse.data.assetGroups;
-    if (!assetGroups || assetGroups.length === 0) return;
+    expect(Array.isArray(assetGroups)).toBe(true);
+    expect(assetGroups.length).toBeGreaterThan(0);
 
     const assetGroup = assetGroups[0];
     const response = await apiClient.get<RwaFilterResponse>(
@@ -100,6 +101,7 @@ describe('RWA API - Filter by Asset Group', () => {
     expectObjectResponse(response);
     expect(response.data).toHaveProperty('data');
     expect(Array.isArray(response.data.data)).toBe(true);
+    expect(response.data.data.length).toBeGreaterThan(0);
   });
 
   it('should return empty data for non-existent assetGroup', async () => {
