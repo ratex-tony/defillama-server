@@ -169,9 +169,18 @@ export async function storeGetProtocols({
   ).filter((p) => !hiddenCategoriesFromUISet.has(p.category ?? ""));
 
   const chains = {} as { [chain: string]: number };
+  const protocolChainLabels: string[] = [];
+  const protocolChainLabelsSet = new Set<string>();
   const protocolCategoriesSet: Set<string> = new Set();
 
   trimmedResponse.forEach((p) => {
+    for (const chain of p.chains) {
+      if (protocolChainLabelsSet.has(chain)) continue;
+
+      protocolChainLabelsSet.add(chain);
+      protocolChainLabels.push(chain);
+    }
+
     if (!p.category) return;
 
     protocolCategoriesSet.add(p.category);
@@ -266,7 +275,11 @@ export async function storeGetProtocols({
     console.warn('Missing /dimensions/chain-agg-data while computing visible chains for /lite/protocols2, falling back to cached visible chains');
   }
 
-  const chainsOutput = getVisibleChainLabels(chains, dimensionsChainAggData ?? {}, fallbackChainLabels)
+  const chainsOutput = getVisibleChainLabels(
+    chains,
+    dimensionsChainAggData ?? {},
+    fallbackChainLabels.concat(protocolChainLabels),
+  )
 
 
   const protocols2Data = {
