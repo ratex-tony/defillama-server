@@ -141,6 +141,9 @@ function parseAsterMarkets(
     const indexPx = safeFloat(premium?.indexPrice);
     const lastPx = safeFloat(ticker?.lastPrice);
     const openPx = safeFloat(ticker?.openPrice);
+    // Premium = (mark − index) / index, expressed as a decimal to match the
+    // ParsedPerpsMarket convention (Dashboard.tsx multiplies by 100 at render).
+    const premiumDecimal = markPx > 0 && indexPx > 0 ? (markPx - indexPx) / indexPx : 0;
 
     markets.push({
       contract: `aster:${s.baseAsset}`,
@@ -155,8 +158,13 @@ function parseAsterMarkets(
       prevDayPx: openPx,
       priceChange24h: pctChange(lastPx, openPx),
       fundingRate: safeFloat(premium?.lastFundingRate),
-      premium: 0,
-      maxLeverage: 0, // not exposed on /exchangeInfo in a normalized form
+      premium: premiumDecimal,
+      // Aster's /leverageBracket is auth-gated, and `requiredMarginPercent` on
+      // /exchangeInfo is 5% across all symbols (BTC = AAPL = XAU = …) so it's
+      // a tier-1 floor, not a per-market max-lev signal. No public derivation
+      // available — emit null so the dashboard can distinguish "unknown" from
+      // a real 0 rather than show a misleading number.
+      maxLeverage: null,
       szDecimals: safeFloat(s.quantityPrecision),
     });
   }
