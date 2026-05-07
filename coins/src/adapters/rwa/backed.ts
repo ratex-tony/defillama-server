@@ -107,14 +107,6 @@ async function getTokenPrices(chain: string, timestamp: number) {
     })),
   );
 
-  const extraChains = ["avax", "base", "polygon", "xdai"];
-  const originals = writes.slice();
-  for (const w of originals) {
-    const addressPart = w.PK.substring(w.PK.indexOf(":") + 1);
-    for (const extraChain of extraChains) {
-      writes.push({ ...w, PK: `asset#${extraChain}:${addressPart}` });
-    }
-  }
   return writes;
 }
 

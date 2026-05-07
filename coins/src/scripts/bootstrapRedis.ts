@@ -87,7 +87,7 @@ async function main() {
 
     const pipeline = redis.pipeline();
     for (const p of page) {
-      if (!p.price || p.price === "0") continue;
+      if (!p.price) continue;
       const priceNum = Number(p.price);
       if (!Number.isFinite(priceNum)) continue;
       pipeline.set(`price:${p.canonical_id}`, JSON.stringify({ price: priceNum, confidence: p.confidence ? parseFloat(p.confidence) : null, source: p.adapter || null, timestamp: p.latest_ts || null }), "EX", PRICE_TTL);
