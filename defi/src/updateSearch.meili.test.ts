@@ -1,6 +1,6 @@
 import fetch from "node-fetch";
 import dotenv from "dotenv";
-import { PAGES_INDEX_SETTINGS } from "./updateSearch";
+import { PAGES_INDEX_SETTINGS, SEARCH_DEPTH_RANK } from "./updateSearch";
 
 if (process.env.APP_ENV) dotenv.config({ path: process.env.APP_ENV, override: false });
 
@@ -19,6 +19,7 @@ interface SearchHit {
   route: string;
   subName?: string;
   type?: string;
+  topLevelRank?: number;
 }
 
 interface SearchCase {
@@ -26,6 +27,7 @@ interface SearchCase {
   firstRoute?: string;
   blockedSubNames?: string[];
   routesWithinRank?: Array<{ route: string; maxRank: number }>;
+  routesBeforeRoutes?: Array<{ beforeRoute: string; afterRoute: string }>;
 }
 
 const SEARCH_CASES: SearchCase[] = [
@@ -37,15 +39,24 @@ const SEARCH_CASES: SearchCase[] = [
   {
     query: "aave",
     firstRoute: "/protocol/aave",
-    routesWithinRank: [{ route: "/protocol/aave?tvl=false&fees=true", maxRank: 15 }],
+    routesWithinRank: [{ route: "/protocol/aave?tvl=false&fees=true", maxRank: 25 }],
   },
   { query: "stabble", firstRoute: "/protocol/stabble" },
+  {
+    query: "stab",
+    firstRoute: "/protocol/stab-protocol",
+    routesWithinRank: [{ route: "/stablecoins", maxRank: 3 }],
+    routesBeforeRoutes: [{ beforeRoute: "/stablecoins", afterRoute: "/protocol/stab-protocol?tvl=true" }],
+  },
   { query: "markit", firstRoute: "/protocol/markit" },
   { query: "cap", firstRoute: "/protocol/cap", routesWithinRank: [{ route: "/token/CAP", maxRank: 15 }] },
   {
     query: "usdt",
     firstRoute: "/stablecoin/tether",
-    routesWithinRank: [{ route: "/stablecoin/tether", maxRank: 5 }, { route: "/token/USDT", maxRank: 10 }],
+    routesWithinRank: [
+      { route: "/stablecoin/tether", maxRank: 5 },
+      { route: "/token/USDT", maxRank: 10 },
+    ],
   },
   { query: "usdc", firstRoute: "/stablecoin/usd-coin", routesWithinRank: [{ route: "/token/USDC", maxRank: 10 }] },
   { query: "eth", routesWithinRank: [{ route: "/token/ETH", maxRank: 5 }] },
@@ -122,7 +133,11 @@ async function getSearchDocuments() {
   if (!process.env.SEARCH_MASTER_KEY) {
     throw new Error("Set SEARCH_MASTER_KEY or APP_ENV pointing to an env file before running search tests");
   }
-  return getProdPagesDocuments();
+  const results = await getProdPagesDocuments();
+  return results.map((result) => ({
+    ...result,
+    topLevelRank: result.topLevelRank ?? (result.subName ? SEARCH_DEPTH_RANK.subPage : SEARCH_DEPTH_RANK.topLevel),
+  }));
 }
 
 describeSearch("search results in Meilisearch", () => {
@@ -158,20 +173,30 @@ describeSearch("search results in Meilisearch", () => {
     }
   });
 
-  test.each(SEARCH_CASES)("$query", async ({ query, firstRoute, blockedSubNames, routesWithinRank }) => {
-    const hits = await search(query);
+  test.each(SEARCH_CASES)(
+    "$query",
+    async ({ query, firstRoute, blockedSubNames, routesWithinRank, routesBeforeRoutes }) => {
+      const hits = await search(query);
 
-    if (firstRoute) expect(hits[0]?.route).toBe(firstRoute);
+      if (firstRoute) expect(hits[0]?.route).toBe(firstRoute);
 
-    for (const subName of blockedSubNames ?? []) {
-      const subpageHit = hits.find((hit) => hit.subName === subName);
-      expect(subpageHit).toBeUndefined();
+      for (const subName of blockedSubNames ?? []) {
+        const subpageHit = hits.find((hit) => hit.subName === subName);
+        expect(subpageHit).toBeUndefined();
+      }
+
+      for (const expected of routesWithinRank ?? []) {
+        const rank = hits.findIndex((hit) => hit.route === expected.route) + 1;
+        expect(rank).toBeGreaterThan(0);
+        expect(rank).toBeLessThanOrEqual(expected.maxRank);
+      }
+
+      for (const expected of routesBeforeRoutes ?? []) {
+        const beforeRank = hits.findIndex((hit) => hit.route === expected.beforeRoute) + 1;
+        const afterRank = hits.findIndex((hit) => hit.route === expected.afterRoute) + 1;
+        expect(beforeRank).toBeGreaterThan(0);
+        if (afterRank > 0) expect(beforeRank).toBeLessThan(afterRank);
+      }
     }
-
-    for (const expected of routesWithinRank ?? []) {
-      const rank = hits.findIndex((hit) => hit.route === expected.route) + 1;
-      expect(rank).toBeGreaterThan(0);
-      expect(rank).toBeLessThanOrEqual(expected.maxRank);
-    }
-  });
+  );
 });

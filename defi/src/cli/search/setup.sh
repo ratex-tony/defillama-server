@@ -49,6 +49,7 @@ curl \
     "words",
     "typo",
     "proximity",
+    "topLevelRank:desc",
     "exactness",
     "r:desc",
     "attribute",
@@ -75,7 +76,8 @@ curl \
     "tvl",
     "name",
     "mcapRank",
-    "r"
+    "r",
+    "topLevelRank"
   ]'
 
 curl \

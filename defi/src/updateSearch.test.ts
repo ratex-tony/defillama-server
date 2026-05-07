@@ -1,5 +1,6 @@
 import {
   DIRECTORY_INDEX_SETTINGS,
+  SEARCH_DEPTH_RANK,
   PAGES_INDEX_SETTINGS,
   SEARCH_RANK,
   buildDirectoryResults,
@@ -22,9 +23,10 @@ describe("search index settings", () => {
     expect(PAGES_INDEX_SETTINGS.displayedAttributes).toContain("subName");
   });
 
-  it("keeps exactness before business ranking", () => {
+  it("keeps result depth before exactness and business ranking", () => {
     const rules = PAGES_INDEX_SETTINGS.rankingRules;
 
+    expect(rules.indexOf("topLevelRank:desc")).toBeLessThan(rules.indexOf("exactness"));
     expect(rules.indexOf("exactness")).toBeLessThan(rules.indexOf("r:desc"));
     expect(rules.indexOf("r:desc")).toBeLessThan(rules.indexOf("attribute"));
     expect(rules.indexOf("v:desc")).toBeLessThan(rules.indexOf("sort"));
@@ -41,6 +43,7 @@ describe("search index settings", () => {
       expect.arrayContaining(["symbol", "previousNames", "nameVariants", "keywords", "alias1", "alias5"])
     );
     expect(PAGES_INDEX_SETTINGS.sortableAttributes).toContain("mcapRank");
+    expect(PAGES_INDEX_SETTINGS.sortableAttributes).toContain("topLevelRank");
   });
 
   it("keeps directory search scoped to official URL entries", () => {
@@ -81,12 +84,23 @@ describe("frontend page search docs", () => {
       tastyMetrics: {},
     });
 
-    expect(fees).toMatchObject({ route: "/fees", routeAlias: "fees", r: SEARCH_RANK.navPage });
-    expect(revenue).toMatchObject({ route: "/revenue", routeAlias: "revenue", r: SEARCH_RANK.navPage });
+    expect(fees).toMatchObject({
+      route: "/fees",
+      routeAlias: "fees",
+      r: SEARCH_RANK.navPage,
+      topLevelRank: SEARCH_DEPTH_RANK.topLevel,
+    });
+    expect(revenue).toMatchObject({
+      route: "/revenue",
+      routeAlias: "revenue",
+      r: SEARCH_RANK.navPage,
+      topLevelRank: SEARCH_DEPTH_RANK.topLevel,
+    });
     expect(holdersRevenue).toMatchObject({
       route: "/holders-revenue",
       routeAlias: "holders revenue",
       r: SEARCH_RANK.navPage,
+      topLevelRank: SEARCH_DEPTH_RANK.topLevel,
     });
   });
 
@@ -181,11 +195,13 @@ describe("entity and subpage search docs", () => {
       name: "MarkIt",
       route: "/protocol/markit?tvl=false&fees=true",
       r: SEARCH_RANK.subPage,
+      topLevelRank: SEARCH_DEPTH_RANK.subPage,
     });
     expect(subPages.find((page) => page.subName === "Revenue")).toMatchObject({
       name: "MarkIt",
       route: "/protocol/markit?tvl=false&revenue=true",
       r: SEARCH_RANK.subPage,
+      topLevelRank: SEARCH_DEPTH_RANK.subPage,
     });
     expect(subPages.some((page) => "routeAlias" in page)).toBe(false);
   });
@@ -212,10 +228,25 @@ describe("entity and subpage search docs", () => {
       v: 0,
     });
 
-    expect(stabble).toMatchObject({ name: "Stabble", symbol: "STB", r: SEARCH_RANK.entity });
-    expect(markit).toMatchObject({ name: "MarkIt", route: "/protocol/markit", r: SEARCH_RANK.entity });
+    expect(stabble).toMatchObject({
+      name: "Stabble",
+      symbol: "STB",
+      r: SEARCH_RANK.entity,
+      topLevelRank: SEARCH_DEPTH_RANK.topLevel,
+    });
+    expect(markit).toMatchObject({
+      name: "MarkIt",
+      route: "/protocol/markit",
+      r: SEARCH_RANK.entity,
+      topLevelRank: SEARCH_DEPTH_RANK.topLevel,
+    });
     expect(markit.nameVariants).toContain("Mark It");
-    expect(stab).toMatchObject({ name: "STAB Protocol", symbol: "ILIS", r: SEARCH_RANK.entity });
+    expect(stab).toMatchObject({
+      name: "STAB Protocol",
+      symbol: "ILIS",
+      r: SEARCH_RANK.entity,
+      topLevelRank: SEARCH_DEPTH_RANK.topLevel,
+    });
     expect(stab.routeAlias).toBeUndefined();
   });
 
@@ -231,6 +262,7 @@ describe("entity and subpage search docs", () => {
       symbol: "USDT",
       route: "/stablecoin/tether",
       r: SEARCH_RANK.entity,
+      topLevelRank: SEARCH_DEPTH_RANK.topLevel,
       type: "Stablecoin",
     });
     expect(usdCoin).toMatchObject({
@@ -238,6 +270,7 @@ describe("entity and subpage search docs", () => {
       symbol: "USDC",
       route: "/stablecoin/usd-coin",
       r: SEARCH_RANK.entity,
+      topLevelRank: SEARCH_DEPTH_RANK.topLevel,
       type: "Stablecoin",
     });
   });
