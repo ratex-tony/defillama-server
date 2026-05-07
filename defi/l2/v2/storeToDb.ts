@@ -27,31 +27,44 @@ export async function storeHistoricalToDB(res: { timestamp: number; value: any }
   };
   const sql = await iniDbConnection();
 
-  await queryPostgresWithRetry(
-    sql`
-        insert into chainassets2
-        ${sql([write], ...columns)}
-        `,
-    sql
-  );
-  sql.end();
+  try {
+    await queryPostgresWithRetry(
+      sql`
+          insert into chainassets2
+          ${sql([write], ...columns)}
+          `,
+      sql
+    );
+  } finally {
+    sql.end();
+  }
 
-  await precomputeHistoricalCache();
+  // Cache rebuild is best-effort: the row is already persisted, so a precompute
+  // failure must not surface as a publish failure.
+  try {
+    await precomputeHistoricalCache();
+  } catch (e: any) {
+    console.error("precomputeHistoricalCache failed (DB row already persisted):", e?.message);
+  }
 }
 
 // precompute all-chains and per-chain totals into file cache after each DB store
 async function precomputeHistoricalCache() {
   const sql = await iniDbConnection();
-  const rows = await queryPostgresWithRetry(
-    sql`
-      select distinct on (date_trunc('day', to_timestamp(timestamp)))
-        timestamp, value
-      from chainassets2
-      order by date_trunc('day', to_timestamp(timestamp)) asc, timestamp desc
-    `,
-    sql
-  );
-  sql.end();
+  let rows: any[];
+  try {
+    rows = await queryPostgresWithRetry(
+      sql`
+        select distinct on (date_trunc('day', to_timestamp(timestamp) AT TIME ZONE 'UTC'))
+          timestamp, value
+        from chainassets2
+        order by date_trunc('day', to_timestamp(timestamp) AT TIME ZONE 'UTC') asc, timestamp desc
+      `,
+      sql
+    );
+  } finally {
+    sql.end();
+  }
 
   rows.sort((a: any, b: any) => a.timestamp - b.timestamp);
 
@@ -121,30 +134,34 @@ async function fetchHistoricalFromDBDirect(
 ) {
   const sql = await iniDbConnection();
 
-  const allData = chain
-    ? await queryPostgresWithRetry(
-        sql`
-          select timestamp, value::jsonb->${chain} as chain_value
-          from (
-            select distinct on (date_trunc('day', to_timestamp(timestamp)))
+  let allData: any[];
+  try {
+    allData = chain
+      ? await queryPostgresWithRetry(
+          sql`
+            select timestamp, value::jsonb->${chain} as chain_value
+            from (
+              select distinct on (date_trunc('day', to_timestamp(timestamp) AT TIME ZONE 'UTC'))
+                timestamp, value
+              from chainassets2
+              order by date_trunc('day', to_timestamp(timestamp) AT TIME ZONE 'UTC') asc, timestamp desc
+            ) daily
+            order by timestamp asc
+          `,
+          sql
+        )
+      : await queryPostgresWithRetry(
+          sql`
+            select distinct on (date_trunc('day', to_timestamp(timestamp) AT TIME ZONE 'UTC'))
               timestamp, value
             from chainassets2
-            order by date_trunc('day', to_timestamp(timestamp)) asc, timestamp desc
-          ) daily
-          order by timestamp asc
-        `,
-        sql
-      )
-    : await queryPostgresWithRetry(
-        sql`
-          select distinct on (date_trunc('day', to_timestamp(timestamp)))
-            timestamp, value
-          from chainassets2
-          order by date_trunc('day', to_timestamp(timestamp)) asc, timestamp desc
-        `,
-        sql
-      );
-  sql.end();
+            order by date_trunc('day', to_timestamp(timestamp) AT TIME ZONE 'UTC') asc, timestamp desc
+          `,
+          sql
+        );
+  } finally {
+    sql.end();
+  }
 
   const data = chain
     ? allData.filter((d: any) => d.chain_value != null).map((d: any) => ({ timestamp: d.timestamp, [chain]: d.chain_value }))
@@ -192,8 +209,12 @@ async function fetchHistoricalFromDBDirect(
         Object.keys(d[chain]).map((section) => {
           symbolEntry.data[section] = { total: d[chain][section].total, breakdown: {} };
           Object.keys(d[chain][section].breakdown ?? {}).forEach((asset: string) => {
-            if (!symbolMap[asset]) return;
-            symbolEntry.data[section].breakdown[symbolMap[asset]] = d[chain][section].breakdown[asset];
+            const symbol = symbolMap[asset];
+            if (!symbol) return;
+            // Multiple asset keys can resolve to the same symbol; aggregate to
+            // avoid silently overwriting earlier entries.
+            const prev = Number(symbolEntry.data[section].breakdown[symbol] ?? 0);
+            symbolEntry.data[section].breakdown[symbol] = prev + Number(d[chain][section].breakdown[asset] ?? 0);
           });
         });
       } else {
@@ -203,8 +224,10 @@ async function fetchHistoricalFromDBDirect(
         Object.keys(d[c]).map((section) => {
           symbolEntry.data[readableChain][section] = { total: d[c][section].total, breakdown: {} };
           Object.keys(d[c][section].breakdown ?? {}).forEach((asset: string) => {
-            if (!symbolMap[asset]) return;
-            symbolEntry.data[readableChain][section].breakdown[symbolMap[asset]] = d[c][section].breakdown[asset];
+            const symbol = symbolMap[asset];
+            if (!symbol) return;
+            const prev = Number(symbolEntry.data[readableChain][section].breakdown[symbol] ?? 0);
+            symbolEntry.data[readableChain][section].breakdown[symbol] = prev + Number(d[c][section].breakdown[asset] ?? 0);
           });
         });
       }

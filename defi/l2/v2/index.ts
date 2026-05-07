@@ -21,7 +21,7 @@ import { additional, excluded } from "../adapters/manual";
 import { storeHistoricalToDB } from "./storeToDb";
 import { stablecoins } from "../../src/getProtocols";
 import { metadata as rwaMetadata } from "../../src/rwa/protocols";
-import { verifyChanges } from "../verifyChanges";
+import { verifyChangesV2 } from "./verifyChanges";
 import { fetchTokensList } from "../../src/utils/coinsApi";
 import { getClosestProtocolItem, getLatestProtocolItems, initializeTVLCacheDB } from "../../src/api2/db";
 import { hourlyRawTokensTvl } from "../../src/utils/getLastRecord";
@@ -384,7 +384,7 @@ const newChainAssets = () => ({
 });
 
 // main function
-export async function storeChainAssetsV2(override: boolean = false) {
+export async function storeChainAssetsV2(override: boolean = false, dryRun: boolean = false) {
   if (!process.env.COINS_V4_API_URL) {
     throw new Error("storeChainAssetsV2 requires COINS_V4_API_URL — run with coins v4 API configured");
   }
@@ -411,12 +411,25 @@ export async function storeChainAssetsV2(override: boolean = false) {
     console.log(`[bridge-price-fill] resolving ${missingBridgeKeys.length} missing bridge/protocol keys via coins API`);
     try {
       const extra = await coins.getPrices(missingBridgeKeys, timestamp);
-      const got = Object.keys(extra).length;
-      console.log(`[bridge-price-fill]   resolved ${got}/${missingBridgeKeys.length}  (sample:`, Object.keys(extra).slice(0, 5), ")");
-      Object.keys(extra).forEach((k) => {
+      const resolvedKeys = Object.keys(extra);
+      console.log(`[bridge-price-fill]   resolved ${resolvedKeys.length}/${missingBridgeKeys.length}  (sample:`, resolvedKeys.slice(0, 5), ")");
+      resolvedKeys.forEach((k) => {
         if (k.startsWith("coingecko:")) (extra[k] as any).decimals = 0; // match native-side convention
         allPrices[k] = extra[k];
       });
+      // nativeDataAfterMcaps drops keys that have no mcap entry, so the bridge
+      // fill must include mcaps for the same keys or every newly-priced bridge
+      // amount silently disappears in the next stage.
+      if (resolvedKeys.length) {
+        try {
+          const extraMcaps = await coins.getMcaps(resolvedKeys, timestamp);
+          Object.keys(extraMcaps).forEach((k) => {
+            allMcaps[k] = extraMcaps[k];
+          });
+        } catch (e: any) {
+          console.warn("[bridge-price-fill] mcap fetch failed:", e?.message);
+        }
+      }
     } catch (e: any) {
       console.warn("[bridge-price-fill] failed:", e?.message);
     }
@@ -426,12 +439,16 @@ export async function storeChainAssetsV2(override: boolean = false) {
   // ("AXLUSDC", "ATOM"). normalizeKey turns those into "coingecko:axlusdc", which
   // almost never matches a real coingecko id. Build a reverse symbol → pricing
   // index from allPrices so those can still be resolved in the destination loop.
-  const symbolToPrice: { [symbol: string]: CoinsApiData } = {};
-  Object.values(allPrices).forEach((p) => {
+  // We also keep the resolved key alongside the data so the destination loop
+  // can re-key the amount under a key that actually exists in allMcaps; storing
+  // under the unresolved "coingecko:axlusdc" would cause it to be dropped by
+  // the mcap stage downstream.
+  const symbolToPrice: { [symbol: string]: { key: string; data: CoinsApiData } } = {};
+  Object.entries(allPrices).forEach(([priceKey, p]) => {
     const sym = p?.symbol?.toUpperCase();
     if (!sym) return;
     // Prefer the first resolution; symbol collisions are ambiguous by construction.
-    if (!symbolToPrice[sym]) symbolToPrice[sym] = p;
+    if (!symbolToPrice[sym]) symbolToPrice[sym] = { key: priceKey, data: p };
   });
 
   // adjust native asset balances by excluded and outgoing amounts
@@ -464,6 +481,7 @@ export async function storeChainAssetsV2(override: boolean = false) {
       Object.keys(destinationChainAmount).map((token: string) => {
         const key = normalizeKey(token);
         let coinData = allPrices[key];
+        let outputKey = key;
         // When the adapter was symbol-keyed, `key` looks like "coingecko:axlusdc" but
         // there is no such coingecko id. Fall back to a symbol reverse lookup.
         // Symbol-keyed adapter output is also typically in whole tokens, not base
@@ -472,15 +490,18 @@ export async function storeChainAssetsV2(override: boolean = false) {
         if ((!coinData || !coinData.price) && key.startsWith("coingecko:")) {
           const symbol = key.slice("coingecko:".length).toUpperCase();
           const resolved = symbolToPrice[symbol];
-          if (resolved?.price) {
-            coinData = resolved;
+          if (resolved?.data?.price) {
+            coinData = resolved.data;
+            // Re-key the amount under the resolved key so allMcaps lookups
+            // downstream actually find an entry.
+            outputKey = resolved.key;
             isWholeTokenAmount = true;
           }
         }
         if (!coinData || !coinData.price) return;
         const divisor = isWholeTokenAmount ? BigNumber(1) : BigNumber(10).pow(coinData.decimals);
         const usdAmount = destinationChainAmount[token].times(coinData.price).div(divisor);
-        nativeDataAfterDeductions[chain][key] = usdAmount;
+        nativeDataAfterDeductions[chain][outputKey] = usdAmount;
       });
     }
   });
@@ -564,10 +585,9 @@ export async function storeChainAssetsV2(override: boolean = false) {
     });
   });
 
-  // create symbol key data — only actually issue the R2 write when not in dry-run mode
-  const symbolMapPromise = dryRun
-    ? Promise.resolve()
-    : storeR2JSONString("chainAssetsSymbolMap", JSON.stringify(symbolMap));
+  // The symbol-map R2 write is deferred to the post-validation Promise.all
+  // below so we never persist an updated map for a snapshot that
+  // verifyChangesV2 ends up rejecting.
   [rawData, symbolData].map((allData) => {
     Object.keys(allData).map((chain: Chain) => {
       let totalTotal = zero;
@@ -613,7 +633,7 @@ export async function storeChainAssetsV2(override: boolean = false) {
   }
 
   await Promise.all([
-    symbolMapPromise,
+    storeR2JSONString("chainAssetsSymbolMap", JSON.stringify(symbolMap)),
     storeHistoricalToDB({ timestamp: getCurrentUnixTimestamp(), value: rawData }),
     storeR2JSONString("chainAssets2", JSON.stringify({ timestamp: getCurrentUnixTimestamp(), value: symbolData })),
   ]);

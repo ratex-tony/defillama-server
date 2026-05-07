@@ -314,7 +314,7 @@ async function getStellarSupplies(tokens: string[], timestamp?: number): Promise
       const classicKey = stellarSacToClassic[upper] ?? upper;
       // base (code, issuer); issuer is the trailing 56-char G-prefixed string;
       // anything after that (e.g. "-1", "-2") is a versioning artifact.
-      const m = classicKey.match(/^(.+-[A-Z2-7]{55})(?:-\d+)?$/);
+      const m = classicKey.match(/^(.+-[A-Z2-7]{56})(?:-\d+)?$/);
       canonicalKey = m ? m[1] : classicKey;
     }
     if (seen.has(canonicalKey)) continue;
@@ -334,7 +334,9 @@ async function getStellarSupplies(tokens: string[], timestamp?: number): Promise
         // Native Soroban contracts: call total_supply() via RPC
         if (isSorobanContractId(token)) {
           const supply = await getSorobanTokenSupply(token);
-          if (supply != null && supply > BigInt(0)) supplies[`stellar:${rawToken}`] = Number(supply);
+          // getSorobanTokenSupply returns number | null; mixing BigInt(0) into
+          // the comparison would throw at runtime, so compare in the number domain.
+          if (supply != null && supply > 0) supplies[`stellar:${rawToken}`] = supply;
           return;
         }
 

@@ -27,10 +27,15 @@ async function ensureDirExists(folder: string): Promise<void> {
 async function storeData(subPath: string, data: any): Promise<void> {
   const filePath = path.join(VERSIONED_CACHE_DIR, subPath);
   await ensureDirExists(path.dirname(filePath));
+  // Write to a temp file in the same directory and rename, so a crash mid-write
+  // can't leave a truncated/empty cache file in place.
+  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   try {
-    await fs.promises.writeFile(filePath, JSON.stringify(data));
+    await fs.promises.writeFile(tmpPath, JSON.stringify(data));
+    await fs.promises.rename(tmpPath, filePath);
   } catch (e) {
     console.error(`Error storing cache ${filePath}:`, (e as any)?.message);
+    fs.promises.unlink(tmpPath).catch(() => {});
   }
 }
 
@@ -44,12 +49,20 @@ async function readData(subPath: string): Promise<any> {
   }
 }
 
+// Strip anything that could escape the cache directory (slashes, dots, control
+// chars) before the chain name is interpolated into a file path. Dashes and
+// underscores stay so existing chain keys like "polygon-zkevm" round-trip.
+function normalizeChain(chain: string): string {
+  const cleaned = (chain ?? "").replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase();
+  return cleaned || "unknown";
+}
+
 export async function storeChainHistory(chain: string, data: any[]): Promise<void> {
-  await storeData(`history/${chain}.json`, data);
+  await storeData(`history/${normalizeChain(chain)}.json`, data);
 }
 
 export async function readChainHistory(chain: string): Promise<any[] | null> {
-  return readData(`history/${chain}.json`);
+  return readData(`history/${normalizeChain(chain)}.json`);
 }
 
 export async function storeAllChainsHistory(data: any[]): Promise<void> {
