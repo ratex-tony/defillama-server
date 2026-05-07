@@ -9,6 +9,7 @@ import {
   dedupeFrontendPageResults,
   getFrontendPageRouteAlias,
   getProtocolSubSections,
+  shouldSkipProtocolSearchResult,
 } from "./updateSearch";
 
 describe("search index settings", () => {
@@ -142,6 +143,23 @@ describe("frontend page search docs", () => {
 });
 
 describe("entity and subpage search docs", () => {
+  it("skips zero-tvl canonical bridge rows that duplicate chain search results", () => {
+    const chainNames = new Set(["Arbitrum", "Solana", "Zircuit"]);
+
+    expect(
+      shouldSkipProtocolSearchResult({ name: "Solana", category: "Canonical Bridge", tvl: null }, chainNames)
+    ).toBe(true);
+    expect(shouldSkipProtocolSearchResult({ name: "Arbitrum", category: "Canonical Bridge", tvl: 0 }, chainNames)).toBe(
+      true
+    );
+    expect(
+      shouldSkipProtocolSearchResult({ name: "Arbitrum Bridge", category: "Canonical Bridge", tvl: 100 }, chainNames)
+    ).toBe(false);
+    expect(
+      shouldSkipProtocolSearchResult({ name: "Zircuit", category: "Canonical Bridge", tvl: 100 }, chainNames)
+    ).toBe(false);
+  });
+
   it("keeps protocol subpages below entities and without route aliases", () => {
     const result = buildProtocolSearchResult({
       id: "protocol_markit",
@@ -202,10 +220,7 @@ describe("entity and subpage search docs", () => {
   });
 
   it("keeps stablecoin symbols indexed for USDT and USDC searches", () => {
-    const tether = buildStablecoinSearchResult(
-      { name: "Tether", symbol: "USDT", circulating: { peggedUSD: 100 } },
-      {}
-    );
+    const tether = buildStablecoinSearchResult({ name: "Tether", symbol: "USDT", circulating: { peggedUSD: 100 } }, {});
     const usdCoin = buildStablecoinSearchResult(
       { name: "USD Coin", symbol: "USDC", circulating: { peggedUSD: 100 } },
       {}

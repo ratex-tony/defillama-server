@@ -116,6 +116,12 @@ interface StablecoinSearchInput {
   circulating: { peggedUSD: number };
 }
 
+interface ProtocolSearchSource {
+  name: string;
+  category?: string;
+  tvl?: number | null;
+}
+
 export const PAGES_INDEX_SETTINGS = {
   searchableAttributes: [
     "alias1",
@@ -146,20 +152,20 @@ export const PAGES_INDEX_SETTINGS = {
     "symbol",
   ],
   synonyms: {
-    stable: ["stablecoin", "stablecoins"],
-    stablecoin: ["stable", "stablecoins"],
-    stablecoins: ["stable", "stablecoin"],
-    mcap: ["market cap", "marketcap"],
-    marketcap: ["market cap", "mcap"],
+    "stable": ["stablecoin", "stablecoins"],
+    "stablecoin": ["stable", "stablecoins"],
+    "stablecoins": ["stable", "stablecoin"],
+    "mcap": ["market cap", "marketcap"],
+    "marketcap": ["market cap", "mcap"],
     "market cap": ["mcap", "marketcap"],
-    tvl: ["total value locked"],
-    apy: ["yield", "yields"],
-    yield: ["apy", "yields"],
-    yields: ["apy", "yield"],
-    dex: ["dexs", "exchange"],
-    dexs: ["dex", "exchanges"],
-    cex: ["cexs", "exchange"],
-    cexs: ["cex", "exchanges"],
+    "tvl": ["total value locked"],
+    "apy": ["yield", "yields"],
+    "yield": ["apy", "yields"],
+    "yields": ["apy", "yield"],
+    "dex": ["dexs", "exchange"],
+    "dexs": ["dex", "exchanges"],
+    "cex": ["cexs", "exchange"],
+    "cexs": ["cex", "exchanges"],
   },
 } as const;
 
@@ -258,6 +264,10 @@ export function buildProtocolSearchResult({
   };
 }
 
+export function shouldSkipProtocolSearchResult(protocol: ProtocolSearchSource, chainNames: Set<string>) {
+  return protocol.category === "Canonical Bridge" && chainNames.has(protocol.name) && !protocol.tvl;
+}
+
 export function buildStablecoinSearchResult(
   stablecoin: StablecoinSearchInput,
   tastyMetrics: Record<string, number>
@@ -300,8 +310,7 @@ export function dedupeFrontendPageResults(results: SearchResult[]): SearchResult
     // the longer one into `nameVariants` so it still matches at search time,
     // and union `keywords` + recompute aliases.
     const sameName = existing.name.trim().toLowerCase() === result.name.trim().toLowerCase();
-    const [primary, secondary] =
-      result.name.length < existing.name.length ? [result, existing] : [existing, result];
+    const [primary, secondary] = result.name.length < existing.name.length ? [result, existing] : [existing, result];
 
     const nameVariants = sameName
       ? mergeKeywords(existing.nameVariants, result.nameVariants)
@@ -968,8 +977,10 @@ async function generateSearchList() {
   const protocols: Array<SearchResult> = [];
   const subProtocols: Array<SearchResult> = [];
   const metadataChainSlugs = new Set<string>();
+  const metadataChainNames = new Set<string>();
   for (const chainSlug in chainsMetadata) {
     metadataChainSlugs.add(chainSlug);
+    metadataChainNames.add(chainsMetadata[chainSlug].name);
   }
 
   // Parent protocols are first-class protocol search results. Their child
@@ -1008,6 +1019,7 @@ async function generateSearchList() {
   // added unless they hit the narrow `chain#` fallback below.
   for (const protocol of tvlData.protocols) {
     if (protocol.name === "LlamaSwap") continue;
+    if (shouldSkipProtocolSearchResult(protocol, metadataChainNames)) continue;
     const prevNames = previousNamesMap.get(protocol.name);
     const result = buildProtocolSearchResult({
       id: `protocol_${normalize(protocol.name)}`,
