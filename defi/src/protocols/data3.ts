@@ -5048,6 +5048,7 @@ const data3_0: Protocol[] = [
     tags: ["CLMM"],
     chains: ["Near"],
     module: "veax/index.js",
+    parentProtocol: "parent#veax",
     twitter: "veaxlabs",
     audit_links: ["https://docs.veax.com/overview/security/external-smart-contract-audits"],
     listedAt: 1683143073,
@@ -6472,6 +6473,7 @@ const data3_0: Protocol[] = [
     stablecoins: ["grai"],
     audit_links: ["https://docs.gravitaprotocol.com/gravita-docs/about-gravita-protocol/audits"],
     listedAt: 1684364375,
+    deadUrl: true
   },
   {
     id: "2993",
@@ -7650,6 +7652,7 @@ const data3_0: Protocol[] = [
     github: ["HashMixProject"],
     audit_links: ["https://github.com/HashMixProject/securityAudit"],
     listedAt: 1685532130,
+    deadUrl: true
   },
   {
     id: "3047",
@@ -9630,6 +9633,7 @@ const data3_0: Protocol[] = [
     twitter: "Gplx_io",
     forkedFromIds: ["337"],
     listedAt: 1687310387,
+    deadUrl: true
   },
   {
     id: "3136",
@@ -9920,6 +9924,7 @@ const data3_0: Protocol[] = [
     forkedFromIds: ["2197"],
     listedAt: 1687539781,
     parentProtocol: "parent#claimswap",
+    deadUrl: true
   },
   {
     id: "3151",
@@ -10991,6 +10996,7 @@ const data3_0: Protocol[] = [
     twitter: "tashi_finance",
     audit_links: ["https://tashi-1.gitbook.io/tashi-1/resources/risks-and-audits"],
     listedAt: 1688494770,
+    deadUrl: true
   },
   {
     id: "3199",
@@ -11596,6 +11602,7 @@ const data3_0: Protocol[] = [
     twitter: "Blue__Spade",
     forkedFromIds: ["337"],
     listedAt: 1689244336,
+    deadUrl: true
   },
   {
     id: "3228",
@@ -15535,6 +15542,7 @@ const data3_0: Protocol[] = [
     twitter: "binaryswapio",
     forkedFromIds: ["2197"],
     listedAt: 1692204129,
+    deadUrl: true
   },
   {
     id: "3398",
@@ -28221,6 +28229,7 @@ const data3_1: Protocol[] = [
     twitter: "BuildOnLumia",
     parentProtocol: "parent#orion-protocol",
     listedAt: 1703860590,
+    deadUrl: true
   },
   {
     id: "3977",
@@ -31448,6 +31457,7 @@ const data3_1: Protocol[] = [
     twitter: "hiveswap_io",
     parentProtocol: "parent#hiveswap",
     listedAt: 1707314286,
+    deadUrl: true,
     dimensions: {
       dexs: "hiveswap-v3"
     }
@@ -33125,6 +33135,7 @@ const data3_2: Protocol[] = [
     github: ["haiko-xyz"],
     audit_links: ["https://haiko-docs.gitbook.io/docs/security-and-audits"],
     listedAt: 1709071097,
+    deadUrl: true
   },
   {
     id: "4185",
@@ -33483,7 +33494,8 @@ const data3_2: Protocol[] = [
           ["2026-04-02", "Large $WETH -> $YES and vice versa swaps by a whale"] //0x8C02E8438B6FDEA5dB47Aa5A19DA73374Cee9a91
         ],
       }
-    }
+    },
+    deadUrl: true,
   },
   {
     id: "4200",
@@ -33671,7 +33683,8 @@ const data3_2: Protocol[] = [
     dimensions: {
       fees: "thruster-v2",
       dexs: "thruster-v2"
-    }
+    },
+    deadUrl: true,
   },
   {
     id: "4208",
@@ -36688,6 +36701,7 @@ const data3_2: Protocol[] = [
     twitter: "hiveswap_io",
     parentProtocol: "parent#hiveswap",
     listedAt: 1711119554,
+    deadUrl: true,
   },
   {
     id: "4346",
@@ -38057,6 +38071,7 @@ const data3_2: Protocol[] = [
     module: "MeowMiner/index.js",
     twitter: "MeowCatMiner",
     listedAt: 1711801555,
+    deadUrl: true
   },
   {
     id: "4408",
@@ -44017,6 +44032,7 @@ const data3_2: Protocol[] = [
     twitter: "Kalax_io",
     audit_links: ["https://beosin.com/audits/Kalax_202405211051.pdf"],
     listedAt: 1716652747,
+    deadUrl: true
   },
   {
     id: "4678",
@@ -44125,6 +44141,7 @@ const data3_2: Protocol[] = [
       "https://1014032567-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2FqWZZySI6X2fuVa7sc0Jn%2Fuploads%2FR1EKQQ3sseKzTPurwQot%2FSlowMist%20Audit%20Report%20-%20NX%20Finance.pdf?alt=media&token=7b7de8b2-65ee-4cda-89f8-d22b75556d5e",
     ],
     listedAt: 1716816483,
+    deadUrl: true,
   },
   {
     id: "4683",
@@ -46969,7 +46986,8 @@ const data3_3: Protocol[] = [
     dimensions: {
       fees: "mintswap",
       dexs: "mintswap"
-    }
+    },
+    deadUrl: true
   },
   {
     id: "4812",
@@ -49938,7 +49956,8 @@ const data3_3: Protocol[] = [
     listedAt: 1722870499,
     dimensions: {
       dexs: "saturnswap"
-    }
+    },
+    deadUrl: true
   },
   {
     id: "4947",
@@ -50702,7 +50721,8 @@ const data3_3: Protocol[] = [
     module: "dummy.js",
     twitter: "tradewithPhoton",
     dimensions: {
-      fees: "photon"
+      fees: "photon",
+      dexs: "photon",
     }
   },
   {
@@ -53585,7 +53605,8 @@ const data3_3: Protocol[] = [
     chains: ["Oasys"],
     module: "oas-jumbo/index.js",
     twitter: "oasjumbo",
-    listedAt: 1725872341
+    listedAt: 1725872341,
+    deadUrl: true
   },
   {
     id: "5114",
@@ -56854,7 +56875,8 @@ const data3_3: Protocol[] = [
     module: "zenolend/index.js",
     twitter: "ZenoLend",
     github: ["Zeno-Finance"],
-    listedAt: 1729664952
+    listedAt: 1729664952,
+    deadUrl: true,
   },
   {
     id: "5264",
@@ -58292,7 +58314,8 @@ const data3_3: Protocol[] = [
     chains: ["Taiko"],
     module: "unagiswap/index.js",
     twitter: "Unagi_Swap",
-    listedAt: 1730986517
+    listedAt: 1730986517,
+    deadUrl: true
   },
   {
     id: "5328",
@@ -60767,7 +60790,8 @@ const data3_3: Protocol[] = [
     chains: ["Neutron"],
     module: "nfazone/index.js",
     twitter: "nfadotzone",
-    listedAt: 1732831797
+    listedAt: 1732831797,
+    deadUrl: true
   },
   {
     id: "5441",
@@ -61397,7 +61421,7 @@ const data3_3: Protocol[] = [
     deadUrl: true
   },
   {
-    id: "5471",
+    id: "<5471>",
     name: "OpenTrade",
     address: null,
     symbol: "-",

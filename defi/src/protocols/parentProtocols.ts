@@ -2136,6 +2136,7 @@ const parentProtocols: IParentProtocol[] = [
     chains: [],
     github: ["claimswap"],
     twitter: "claimswap",
+    deadUrl: true,
   },
   {
     id: "parent#swapscanner",
@@ -3886,6 +3887,7 @@ const parentProtocols: IParentProtocol[] = [
     cmcId: null,
     chains: [],
     twitter: "hiveswap_io",
+    deadUrl: true,
   },
   {
     id: "parent#claystack",
@@ -4105,6 +4107,7 @@ const parentProtocols: IParentProtocol[] = [
     cmcId: null,
     chains: [],
     twitter: "ThrusterFi",
+    deadUrl: true,
   },
   {
     id: "parent#monoswap",
@@ -7101,8 +7104,8 @@ const parentProtocols: IParentProtocol[] = [
   {
     id: "parent#hypurfi",
     name: "HypurrFi",
-    url: "https://hypurrfi.com/points?af=defillama",
-    referralUrl: "https://hypurrfi.com/points?af=defillama",
+    url: "https://hypurrfi.com/",
+    //referralUrl: "https://hypurrfi.com/points?af=defillama",
     description: "Collateralize borrowing positions and loop and lever up your yield",
     logo: `${baseIconsUrl}/hypurrfi.png`,
     gecko_id: null,
@@ -9632,6 +9635,18 @@ const parentProtocols: IParentProtocol[] = [
     chains: [],
     twitter: "Corkprotocol",
     github: ["Cork-Technology"],
+  },
+  {
+    id: "parent#hermetica",
+    name: "Hermetica",
+    url: "https://hermetica.fi",
+    description: "Hermetica is a synthetic dollar protocol built on Stacks.",
+    logo: `${baseIconsUrl}/hermetica.jpg`,
+    gecko_id: null,
+    cmcId: null,
+    chains: [],
+    twitter: "HermeticaFi",
+    stablecoins: ["hermetica-usdh"],
   },
 ];
 

@@ -1329,6 +1329,7 @@ const data5: Protocol[] = [
     module: "vaultedge/index.js",
     twitter: "VaultedgeFi",
     listedAt: 1762287949,
+    deadUrl: true,
   },
   {
     id: "6950",
@@ -3064,6 +3065,7 @@ const data5: Protocol[] = [
     ],
     github: ["AltaiExchange"],
     listedAt: 1763830355,
+    deadUrl: true,
   },
   {
     id: "7024",
@@ -8338,7 +8340,10 @@ const data5: Protocol[] = [
     module: "hastra/index.js",
     twitter: "HastraFi",
     audit_links: ["https://hastra.io/Hastra_vault-mint_&_vault-stake_Solana_Programs_Summary_Audit_Report.pdf"],
-    listedAt: 1768842285
+    listedAt: 1768842285,
+    dimensions: {
+      fees: "hastra",
+    },
   },
   {
     id: "7267",
@@ -12700,6 +12705,7 @@ const data5: Protocol[] = [
       },
     ],
     listedAt: 1772205522,
+    deadUrl: true,
   },
   {
     id: "7474",
@@ -16146,6 +16152,7 @@ const data5: Protocol[] = [
     dimensions: {
       dexs: "farmcats-market",
     },
+    deadUrl: true
   },
   {
     id: "7636",

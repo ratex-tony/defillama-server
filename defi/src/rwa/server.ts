@@ -1,9 +1,7 @@
 import * as HyperExpress from 'hyper-express';
-import { readRouteData, getCacheVersion, readPGCacheForId } from './file-cache';
+import { readRouteData, getCacheVersion, readPGCacheForId, readFlowsForId, PGCacheRecord } from './file-cache';
 import { rwaSlug } from './utils';
-import { initPG, fetchDailyFlowsForIdPG, computeFlowSeries } from './db';
 import { trimLeadingZeros } from './cron';
-import { getChainLabelFromKey } from '../utils/normalizeChain';
 
 const webserver = new HyperExpress.Server();
 const port = +(process.env.RWA_PORT ?? 5002);
@@ -191,11 +189,24 @@ function setRoutes(router: HyperExpress.Router): void {
             if (!pgCache) {
                 return errorResponse(res, `Asset "${id}" not found`, 404);
             }
-            const data = trimLeadingZeros(
-                Object.entries(pgCache)
-                    .map(([timestamp, record]) => ({ timestamp: Number(timestamp), ...record }))
-                    .sort((a, b) => a.timestamp - b.timestamp)
-            );
+            const sorted = Object.entries(pgCache)
+                .map(([timestamp, record]) => ({ timestamp: Number(timestamp), ...record }))
+                .sort((a, b) => a.timestamp - b.timestamp);
+            const data = trimLeadingZeros(sorted) as Array<{
+                timestamp: number;
+                onChainMcap: number | null;
+                activeMcap: number | null;
+                defiActiveTvl: number | null;
+                totalSupply: number | null;
+                chains: PGCacheRecord['chains'];
+            }>;
+            // Null out per-series leading zeros so charts don't render a flat-zero
+            // pre-data line for series that started later than others.
+            for (const key of ['onChainMcap', 'activeMcap', 'defiActiveTvl'] as const) {
+                for (let i = 0; i < data.length && data[i][key] === 0; i++) {
+                    data[i][key] = null;
+                }
+            }
             return successResponse(res, data, 30);
         })
     );
@@ -279,6 +290,8 @@ function setRoutes(router: HyperExpress.Router): void {
     );
 
     // Daily net-flow time-series for one RWA over [start, end].
+    // Series is pre-computed in cron (see storeFlowsForIdFromChainRecords) and
+    // served from disk; this route filters by the requested window in-memory.
     router.get(
         '/flows/:id',
         errorWrapper(async (req, res) => {
@@ -295,9 +308,11 @@ function setRoutes(router: HyperExpress.Router): void {
                 return errorResponse(res, 'Invalid `end` query param', 400);
             }
 
-            await initPG();
-            const rows = await fetchDailyFlowsForIdPG(String(id), startTs, endTs);
-            const data = computeFlowSeries(rows, getChainLabelFromKey);
+            const series = await readFlowsForId(String(id));
+            if (!series) {
+                return errorResponse(res, `Flows for "${id}" not found`, 404);
+            }
+            const data = series.filter((p: any) => p.timestamp >= startTs && p.timestamp <= endTs);
             return successResponse(res, { id, start: startTs, end: endTs, data }, 30);
         })
     );

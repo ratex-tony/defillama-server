@@ -389,6 +389,7 @@ const data4: Protocol[] = [
     module: "xswap/index.js",
     twitter: "xswapms",
     listedAt: 1735955529,
+    deadUrl: true,
   },
   {
     id: "5577",
@@ -6068,8 +6069,8 @@ const data4: Protocol[] = [
     chains: ["Stacks"],
     module: "hermetica/index.js",
     twitter: "HermeticaFi",
+    parentProtocol: "parent#hermetica",
     audit_links: ["https://docs.hermetica.fi/usdh/audits"],
-    stablecoins: ["hermetica-usdh"],
     listedAt: 1740083754,
   },
   {
@@ -6389,7 +6390,7 @@ const data4: Protocol[] = [
     //previousNames: ["HypurrFi"],
     address: null,
     symbol: "-",
-    url: "https://hypurrfi.com/points?af=defillama",
+    url: "https://hypurrfi.com/",
     description: `Collateralize borrowing positions and loop and lever up your yield`,
     chain: "Hyperliquid L1",
     logo: `${baseIconsUrl}/hypurrfi-pooled.jpg`,
@@ -11990,6 +11991,7 @@ const data4: Protocol[] = [
     audit_links: ["https://www.halborn.com/audits/fan-fun/fan-fun---evm-contracts-96ad13"],
     github: ["fandotfun"],
     listedAt: 1745424763,
+    deadUrl: true,
   },
   {
     id: "6082",
@@ -20452,7 +20454,8 @@ const data4: Protocol[] = [
     listedAt: 1752655880,
     dimensions: {
       // derivatives: "ostrich", // fake, unverified volume, last check 08-11-2025
-    }
+    },
+    deadUrl: true
   },
   {
     id: "6443",

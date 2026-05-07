@@ -61,8 +61,12 @@ async function fetchNativeAndMcaps(timestamp: number): Promise<{
     processor: async (chain: Chain) => {
       // protocol bridge IDs are closed and have no native tvl
       if (Object.values(protocolBridgeIds).includes(chain)) return;
-      await withTimeout(1000 * 60 * 20, minted(chain)).catch(() => {
-        throw new Error(`fetchMinted() timed out for ${chain}`);
+      const startedAt = Date.now();
+      const TIMEOUT_MS = 1000 * 60 * 20;
+      await withTimeout(TIMEOUT_MS, minted(chain)).catch((e) => {
+        const elapsed = Date.now() - startedAt;
+        if (elapsed >= TIMEOUT_MS) throw new Error(`fetchMinted() timed out for ${chain}`);
+        throw new Error(`fetchMinted() failed for ${chain}: ${e?.message ?? e}`);
       });
 
       async function minted(chain: Chain) {

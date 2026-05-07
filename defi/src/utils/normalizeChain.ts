@@ -5245,6 +5245,9 @@ export const chainCoingeckoIds = {
     url: "https://mezo.org",
     github: ["mezo-org"],
     chainId: 31612,
+    dimensions: {
+      fees: "mezo",
+    },
   },
   "GateLayer": {
     geckoId: null,
@@ -5980,6 +5983,13 @@ export const chainCoingeckoIds = {
     twitter: "dango",
     url: "https://dango.exchange/",
   },
+  "RISE": {
+    geckoId: "rise-chain",
+    symbol: "RISE",
+    cmcId: null,
+    twitter: "risechain",
+    url: "https://risechain.com/",
+  },
 } as unknown as ChainCoinGekcoIds;
 
 // We are creating the list here because, later in the code, we include historical chain labels with the same chain metadata, so, chainCoingeckoIds will have duplicate keys
@@ -6233,6 +6243,7 @@ const chainLabelMap = {
   "mythos": "Mythos",
   "heima": "Heima",
   "dango": "Dango",
+  "rise": "RISE",
 } as { [key: string]: string }
 
 // When we decide to change the display name of a chain, we add the mapping for the new name here

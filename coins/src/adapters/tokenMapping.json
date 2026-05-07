@@ -16196,10 +16196,20 @@
       "decimals": 18,
       "symbol": "BTC"
     },
+    "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE": {
+      "to": "coingecko#bitcoin",
+      "decimals": 18,
+      "symbol": "BTC"
+    },
     "0xdD468A1DDc392dcdbEf6db6e34E89AA338F9F186": {
       "to": "coingecko#mezo-usd",
       "decimals": 18,
       "symbol": "MUSD"
+    },
+    "0x7B7c000000000000000000000000000000000001": {
+      "to": "coingecko#mezo",
+      "decimals": 18,
+      "symbol": "MEZO"
     },
     "0x7b7C000000000000000000000000000000000000": {
       "to": "coingecko#bitcoin",
@@ -16208,12 +16218,12 @@
     },
     "0x04671C72Aab5AC02A03c1098314b1BB6B560c197": {
       "to": "coingecko#usd-coin",
-      "decimals": 18,
+      "decimals": 6,
       "symbol": "mUSDC"
     },
     "0xeB5a5d39dE4Ea42C2Aa6A57EcA2894376683bB8E": {
       "to": "coingecko#tether",
-      "decimals": 18,
+      "decimals": 6,
       "symbol": "mUSDT"
     },
     "0x1531b6e3d51BF80f634957dF81A990B92dA4b154": {
@@ -16238,8 +16248,13 @@
     },
     "0x6a7CD8E1384d49f502b4A4CE9aC9eb320835c5d7": {
       "to": "coingecko#coinbase-wrapped-btc",
-      "decimals": 18,
+      "decimals": 8,
       "symbol": "mcbBTC"
+    },
+    "0xdF708431162Ba247dDaE362D2c919e0fbAfcf9DE": {
+      "to": "coingecko#solv-protocol-solvbtc-bbn",
+      "decimals": "18",
+      "symbol": "mxSolvBTC"
     }
   },
   "ore": {
@@ -16794,6 +16809,13 @@
       "to": "coingecko#japan-open-chain",
       "decimals": 18,
       "symbol": "WJOC"
+    }
+  },
+  "rise": {
+    "0xe436820ba0C69702c1d3E601d421c0eF38262739": {
+      "to": "coingecko#usd-coin",
+      "decimals": 6,
+      "symbol": "USDC"
     }
   },
   "doma": {
