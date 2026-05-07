@@ -20,7 +20,7 @@ import { runInPromisePool } from "@defillama/sdk/build/generalUtil";
 import { fetchSupplies } from "../../l2/utils";
 import { getChainDisplayName, getChainIdFromDisplayName } from "../utils/normalizeChain";
 import { cachedFetch } from "@defillama/sdk/build/util/cache";
-import { getCurrentUnixTimestamp, getTimestampAtStartOfDay } from "../utils/date";
+import { getCurrentUnixTimestamp, getTimestampAtStartOfDay, getTimestampAtStartOfDayUTC } from "../utils/date";
 import { storeHistorical, storeMetadata } from "./historical";
 import { initPG, fetchLatestAggregateTotals } from "./db";
 import { fetchEvm, fetchSolana, fetchProvenance, fetchStellar, type WalletEntry } from './balances';
@@ -157,19 +157,42 @@ async function getExcludedBalances(
   return excludedAmounts;
 }
 
-// FX rates: list of { date, rates: { CCY: units-per-USD } }, daily, sorted asc.
-let _fxRatesPromise: Promise<Array<{ date: number; rates: Record<string, number> }>> | null = null;
-function getFxRates() {
-  if (!_fxRatesPromise) {
-    _fxRatesPromise = cachedFetch({
+// FX rates: pre-built day-aligned map for O(1) lookup. Missing days are
+// forward-filled with the most recent prior rate so any timestamp inside the
+// FX range resolves without a search.
+type FxRateMap = {
+  byDay: Map<number, Record<string, number>>;
+  latest: Record<string, number>;
+  firstDay: number;
+  lastDay: number;
+};
+const SECONDS_IN_DAY = 86400;
+let _fxRateMapPromise: Promise<FxRateMap> | null = null;
+function getFxRateMap(): Promise<FxRateMap> {
+  if (!_fxRateMapPromise) {
+    _fxRateMapPromise = cachedFetch({
       key: "stablecoin-fx-rates-full",
       endpoint: "https://llama-stablecoins-data.s3.eu-central-1.amazonaws.com/rates/full",
     }).then((data: any) => {
       if (!Array.isArray(data) || !data.length) throw new Error("FX rates response unavailable");
-      return data.slice().sort((a: any, b: any) => a.date - b.date);
-    }).catch((e) => { _fxRatesPromise = null; throw e; });
+      const sorted = data.slice().sort((a: any, b: any) => a.date - b.date);
+      const sourceByDay = new Map<number, Record<string, number>>();
+      for (const entry of sorted) {
+        sourceByDay.set(getTimestampAtStartOfDayUTC(entry.date), entry.rates);
+      }
+      const firstDay = getTimestampAtStartOfDayUTC(sorted[0].date);
+      const lastDay = getTimestampAtStartOfDayUTC(sorted[sorted.length - 1].date);
+      const byDay = new Map<number, Record<string, number>>();
+      let prev: Record<string, number> | null = null;
+      for (let day = firstDay; day <= lastDay; day += SECONDS_IN_DAY) {
+        const here = sourceByDay.get(day);
+        if (here) prev = here;
+        if (prev) byDay.set(day, prev);
+      }
+      return { byDay, latest: sorted[sorted.length - 1].rates, firstDay, lastDay };
+    }).catch((e) => { _fxRateMapPromise = null; throw e; });
   }
-  return _fxRatesPromise;
+  return _fxRateMapPromise;
 }
 
 function pegTypeToCurrency(pegType: string): string | null {
@@ -178,25 +201,16 @@ function pegTypeToCurrency(pegType: string): string | null {
 }
 
 // Latest rate when timestamp == 0; otherwise rate at-or-before the timestamp.
-function findRateAtOrBefore(
-  rates: Array<{ date: number; rates: Record<string, number> }>,
-  currency: string,
-  timestamp: number,
-): number | null {
-  if (!rates.length) return null;
-  let entry: { rates: Record<string, number> } | undefined;
+function lookupFxRate(fx: FxRateMap, currency: string, timestamp: number): number | null {
+  let rates: Record<string, number> | undefined;
   if (timestamp === 0) {
-    entry = rates[rates.length - 1];
+    rates = fx.latest;
   } else {
-    let lo = 0, hi = rates.length - 1, idx = -1;
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      if (rates[mid].date <= timestamp) { idx = mid; lo = mid + 1; } else { hi = mid - 1; }
-    }
-    if (idx < 0) return null;
-    entry = rates[idx];
+    const day = getTimestampAtStartOfDayUTC(timestamp);
+    if (day < fx.firstDay) return null;
+    rates = fx.byDay.get(day <= fx.lastDay ? day : fx.lastDay);
   }
-  const r = entry?.rates?.[currency];
+  const r = rates?.[currency];
   return typeof r === "number" && r > 0 ? r : null;
 }
 
@@ -255,11 +269,11 @@ async function fetchHistoricalStablecoins(
   // already been multiplied by USD price). Divide by the FX rate at the
   // requested timestamp so downstream RWA mcap is dollar-denominated.
   // If the global rates payload is unavailable (e.g. S3 hiccup), fall through
-  // with an empty list — non-USD pegs hit the per-asset skip below, USD pegs
+  // with a null map — non-USD pegs hit the per-asset skip below, USD pegs
   // are unaffected — rather than failing the whole ATVL run.
-  let fxRates: Array<{ date: number; rates: Record<string, number> }> = [];
+  let fxRateMap: FxRateMap | null = null;
   try {
-    fxRates = await getFxRates();
+    fxRateMap = await getFxRateMap();
   } catch (e) {
     console.error("[atvl] FX rates unavailable, skipping non-USD peg overrides", e);
   }
@@ -279,7 +293,7 @@ async function fetchHistoricalStablecoins(
       let fxDivisor = 1;
       if (pegType && pegType !== "peggedUSD") {
         const currency = pegTypeToCurrency(pegType);
-        const rate = currency ? findRateAtOrBefore(fxRates, currency, timestamp) : null;
+        const rate = currency && fxRateMap ? lookupFxRate(fxRateMap, currency, timestamp) : null;
         if (!rate) {
           // No FX rate for this peg/timestamp — skip the override entirely so
           // the on-chain path (supply × USD price) computes mcap downstream.
