@@ -522,20 +522,6 @@ export function computeFlowSeries(rows: FlowRow[], chainLabelFn: (slug: string) 
     });
 }
 
-export async function fetchDailyFlowsForIdPG(id: string, startTs: number, endTs: number): Promise<FlowRow[]> {
-    const records = await DAILY_RWA_DATA.findAll({
-        attributes: ['timestamp', 'mcap', 'totalsupply'],
-        where: { id, timestamp: { [Op.gte]: startTs, [Op.lte]: endTs } },
-        order: [['timestamp', 'ASC']],
-        raw: true,
-    }) as any[];
-    return records.map((r): FlowRow => ({
-        timestamp: r.timestamp,
-        mcap: parseJsonSafe(r.mcap),
-        totalsupply: parseJsonSafe(r.totalsupply),
-    }));
-}
-
 // Fetch unique timestamps
 export async function fetchTimestampsPG(): Promise<number[]> {
     const results = await DAILY_RWA_DATA.sequelize!.query(

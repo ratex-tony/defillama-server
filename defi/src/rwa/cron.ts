@@ -16,8 +16,9 @@ import {
   PGCacheRecord,
   getPGSyncMetadata,
   setPGSyncMetadata,
+  storeFlowsForId,
 } from './file-cache';
-import { initPG, fetchCurrentPG, fetchMetadataPG, fetchAllDailyRecordsPG, fetchMaxUpdatedAtPG, fetchAllDailyIdsPG, fetchDailyRecordsForIdPG, fetchDailyRecordsWithChainsPG, fetchDailyRecordsWithChainsForIdPG } from './db';
+import { initPG, fetchCurrentPG, fetchMetadataPG, fetchAllDailyRecordsPG, fetchMaxUpdatedAtPG, fetchAllDailyIdsPG, fetchDailyRecordsForIdPG, fetchDailyRecordsWithChainsPG, fetchDailyRecordsWithChainsForIdPG, computeFlowSeries, FlowRow } from './db';
 
 import { shouldEmitRwaBreakdownItem } from './chartBreakdown';
 import { rwaSlug, toFiniteNumberOrZero, smoothHistoricalData, normalizeRwaMetadataForApiInPlace } from './utils';
@@ -476,6 +477,22 @@ export function processRecordsToPGCache(records: any[]): PGCacheData {
   return data;
 }
 
+// Pre-compute the daily net-flow series for one id from already-fetched
+// chain-level daily records. Mirrors the logic the /flows/:id route used to
+// run on every request.
+export function computeFlowsFromChainRecords(records: any[]) {
+  const flowRows: FlowRow[] = records.map((r) => ({
+    timestamp: r.timestamp,
+    mcap: r.mcap || {},
+    totalsupply: r.totalsupply || {},
+  }));
+  return computeFlowSeries(flowRows, getChainLabelFromKey);
+}
+
+async function storeFlowsForIdFromChainRecords(id: string, records: any[]): Promise<void> {
+  await storeFlowsForId(id, computeFlowsFromChainRecords(records));
+}
+
 async function generatePGCache(): Promise<{ updatedIds: number }> {
   console.log('Generating PG cache with chain breakdown...');
   const startTime = Date.now();
@@ -511,6 +528,9 @@ async function generatePGCache(): Promise<{ updatedIds: number }> {
       const newData = processRecordsToPGCache(idRecords);
       const merged = mergePGCacheData(existingCache, newData);
       await storePGCacheForId(id, smoothPGCacheData(merged));
+      // Flows depend on the full per-id history; refetch and recompute.
+      const fullRecords = await fetchDailyRecordsWithChainsForIdPG(id);
+      await storeFlowsForIdFromChainRecords(id, fullRecords);
       updatedIds++;
     }
   } else {
@@ -527,6 +547,7 @@ async function generatePGCache(): Promise<{ updatedIds: number }> {
 
         const data = processRecordsToPGCache(records);
         await storePGCacheForId(id, smoothPGCacheData(data));
+        await storeFlowsForIdFromChainRecords(id, records);
         updatedIds++;
 
         if ((i + 1) % 100 === 0) {

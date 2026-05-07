@@ -148,6 +148,15 @@ export async function readHistoricalDataForId(id: string): Promise<any[] | null>
     return result?.data || null;
 }
 
+// Pre-computed daily net-flow series per ID (served by /flows/:id)
+export async function storeFlowsForId(id: string, data: any[]): Promise<void> {
+    await storeRouteData(`flows/${id}.json`, data);
+}
+
+export async function readFlowsForId(id: string): Promise<any[] | null> {
+    return await readRouteData(`flows/${id}.json`, { skipErrorLog: true });
+}
+
 export function mergeHistoricalData(
     existingData: any[] | null,
     newRecords: any[]

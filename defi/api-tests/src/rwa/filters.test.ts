@@ -102,6 +102,9 @@ describe('RWA API - Filter by Asset Group', () => {
     expect(response.data).toHaveProperty('data');
     expect(Array.isArray(response.data.data)).toBe(true);
     expect(response.data.data.length).toBeGreaterThan(0);
+    response.data.data.forEach((item: any) => {
+      expect(item.assetGroup).toBe(assetGroup);
+    });
   });
 
   it('should return empty data for non-existent assetGroup', async () => {
