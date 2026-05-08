@@ -19,7 +19,7 @@ type Coin = {
   redirect?: string;
 };
 
-const margin = 60; // 30s
+const margin = 60; // 60s
 
 const isFresh = (timestamp: number, searchWidth: number) => {
   if (!timestamp) return true;
