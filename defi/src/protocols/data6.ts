@@ -2099,7 +2099,10 @@ const data6: Protocol[] = [
     listedAt: 1778097214,
     dimensions: {
       "open-interest": "risex-perps-oi",
-      derivatives: "risex-perps",
+      derivatives: {
+        adapter: "risex-perps",
+        genuineSpikes: [["2026-05-07", "-"]]
+      }
     },
   },
   {
