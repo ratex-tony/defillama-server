@@ -2702,11 +2702,6 @@
     }
   },
   "bsc": {
-    "0x4829a1d1fb6ded1f81d26868ab8976648baf9893": {
-      "decimals": "18",
-      "symbol": "RTX",
-      "to": "asset#solana:J1wnHdKvP34fg7TtYdX63UPJMTdXNzJGEqfNJB22vKjU"
-    },
     "0x85636BF94EA95c32e945b0db30A7CDc614F2691e": {
       "decimals": "18",
       "symbol": "sYUSD",
